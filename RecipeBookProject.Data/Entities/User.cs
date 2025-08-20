@@ -23,7 +23,26 @@ public partial class User
     [Unicode(false)]
     public string Email { get; set; } = null!;
 
-    [StringLength(50)]
-    [Unicode(false)]
     public string PasswordHashed { get; set; } = null!;
+
+    [StringLength(50)]
+    public string? Role { get; set; }
+
+    [StringLength(50)]
+    public string? ProfileImageUrl { get; set; }
+
+    [StringLength(50)]
+    public string? Bio { get; set; }
+
+    [StringLength(50)]
+    public string? PersonalWebsite { get; set; }
+
+    [InverseProperty("User")]
+    public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<SavedProduct> SavedProducts { get; set; } = new List<SavedProduct>();
 }

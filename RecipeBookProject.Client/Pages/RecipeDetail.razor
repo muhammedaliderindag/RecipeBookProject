@@ -1,0 +1,1022 @@
+﻿@* @page "/recipe/{id:int}"
+@inject HttpClient Http
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else if (_loading)
+{
+    <div>Yükleniyor…</div>
+}
+else if (product is not null)
+{
+    <div class="container my-3 my-lg-4">
+
+        @if (!string.IsNullOrEmpty(_infoMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @_infoMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+            </div>
+        }
+
+        <!-- === KART: SOLDA RESİM / SAĞDA DETAY === -->
+        <div class="card mb-4">
+            <div class="row g-0 align-items-stretch">
+                <!-- SOL: GÖRSEL -->
+                <div class="col-md-5 col-lg-4">
+                    <img class="w-100 h-100 object-fit-cover rounded-start min-h-260"
+                         src="@product.ImageUrl" alt="@product.ProductName">
+                </div>
+
+                <!-- SAĞ: BAŞLIK + BUTONLAR + METİN + PUANLAMA -->
+                <div class="col-md-7 col-lg-8 position-relative">
+                    <div class="p-3 p-lg-4">
+                        <div class="d-flex align-items-start">
+                            <h1 class="h2 mb-0 me-auto">@product.ProductName</h1>
+
+                            <!-- Kısayol ikonları -->
+                            <div class="d-flex gap-2 ms-3">
+                                <button class="btn btn-light rounded-circle shadow-sm icon-btn"
+                                        title="@(_saved ? "Kaydedildi" : "Kaydet")"
+                                        @onclick="ToggleSave">
+                                    <i class="@(_saved ? "bi bi-bookmark-fill" : "bi bi-bookmark") fs-5"></i>
+                                </button>
+
+                                <button class="btn btn-light rounded-circle shadow-sm icon-btn"
+                                        title="Tarifi Şikayet Et"
+                                        data-bs-toggle="modal" data-bs-target="#reportModal">
+                                    <i class="bi bi-flag fs-5"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="text-body mt-3 mb-4">@product.ProductDetailedText</p>
+
+                        <!-- Puanlama -->
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="fw-semibold me-1">Puanla:</span>
+                            @for (var i = 1; i <= 5; i++)
+                            {
+                                var star = i; // <- closure fix: i’nin kopyası
+                                var filled = ((hoverRating ?? userRating) >= star);
+
+                                <i class="@(filled ? "bi bi-star-fill" : "bi bi-star") fs-4 star"
+                                   role="button" tabindex="0"
+                                   @onmouseover="() => hoverRating = star"
+                                   @onmouseout="() => hoverRating = null"
+                                   @onclick="() => SetRating(star)"></i>
+                            }
+
+                            <small class="text-muted ms-2">
+                                Ortalama: @avgRating.ToString("0.0") / 5 (@totalVotes oy)
+                            </small>
+                            @if (hasRated)
+                            {
+                                <span class="badge bg-success-subtle text-success ms-2">
+                                    Puanınız: @userRating
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === YORUMLAR === -->
+        <!-- === YORUMLAR === -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="bi bi-chat-dots me-2"></i>
+                    Yorumlar <span class="text-muted">(@totalComments)</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted">Göster:</small>
+                    <select class="form-select form-select-sm w-auto"
+                            @onchange="ChangePageSize">
+                        <option value="5" selected="@(@pageSize == 5)">5</option>
+                        <option value="10" selected="@(@pageSize == 10)">10</option>
+                        <option value="20" selected="@(@pageSize == 20)">20</option>
+                        <option value="50" selected="@(@pageSize == 50)">50</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card-body">
+                @if (commentsLoading)
+                {
+                    <div class="text-muted">Yorumlar yükleniyor…</div>
+                }
+                else if (comments.Count == 0)
+                {
+                    <div class="text-muted">Bu tarife henüz yorum yapılmamış. İlk yorumu sen yaz! ✍️</div>
+                }
+                else
+                {
+                    <div class="vstack gap-3">
+                        @foreach (var c in comments)
+                        {
+                            <div class="border rounded p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <strong>@(string.IsNullOrWhiteSpace(c.Name) ? "Anonim" : c.Name)</strong>
+                                    <small class="text-muted">@c.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                                </div>
+                                <div>@c.Text</div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Alt bilgi + sayfalama -->
+                    <div class="d-flex align-items-center justify-content-between mt-3">
+                        <small class="text-muted">
+                            Gösterilen @shownFrom–@shownTo / @totalComments
+                        </small>
+
+                        @if (totalPages > 1)
+                        {
+                            <nav aria-label="Yorum sayfalama">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item @(currentPage == 1 ? "disabled" : null)">
+                                        <button type="button" class="page-link"
+                                                @onclick="() => GoToPage(currentPage - 1)">
+                                            Önceki
+                                        </button>
+                                    </li>
+
+                                    @foreach (var p in VisiblePages())
+                                    {
+                                        if (p == -1)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                                        }
+                                        else
+                                        {
+                                            <li class="page-item @(p == currentPage ? "active" : null)">
+                                                <button type="button" class="page-link"
+                                                        @onclick="() => GoToPage(p)">
+                                                    @p
+                                                </button>
+                                            </li>
+                                        }
+                                    }
+
+                                    <li class="page-item @(currentPage == totalPages ? "disabled" : null)">
+                                        <button type="button" class="page-link"
+                                                @onclick="() => GoToPage(currentPage + 1)">
+                                            Sonraki
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
+                }
+
+            <hr class="my-4" />
+
+                <!-- Yorum Ekle -->
+                <EditForm Model="@newComment" OnValidSubmit="@AddComment">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <InputText class="form-control" @bind-Value="newComment.Name" placeholder="Adınız (opsiyonel)" />
+                        </div>
+                        <div class="col-md-9">
+                            <InputTextArea class="form-control" rows="3" @bind-Value="newComment.Text" placeholder="Yorumunuz" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-send me-1"></i> Gönder
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+
+
+    <!-- === ŞİKAYET MODAL === -->
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-flag me-2 text-danger"></i>Tarifi Şikayet Et</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+
+                <EditForm Model="@report" OnValidSubmit="@SubmitReport">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Gerekçe</label>
+                            <InputRadioGroup @bind-Value="report.Reason">
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Yanıltıcı içerik") />
+                                    <label class="form-check-label">Yanıltıcı içerik</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Uygunsuz / rahatsız edici") />
+                                    <label class="form-check-label">Uygunsuz / rahatsız edici</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Telif / ihlal") />
+                                    <label class="form-check-label">Telif / hak ihlali</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Spam / Reklam") />
+                                    <label class="form-check-label">Spam / reklam</label>
+                                </div>
+                            </InputRadioGroup>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Açıklama (opsiyonel)</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="report.Details" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                        <button type="submit" class="btn btn-danger" data-bs-dismiss="modal">
+                            <i class="bi bi-flag me-1"></i> Gönder
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+            [Parameter]
+            public int id { get; set; }
+
+    private string? _errorMessage;
+    private string? _infoMessage;
+    private ProductDto? product;
+    private bool _loading;
+
+    // Kaydet
+    private bool _saved;
+
+    // Puanlama
+    private int userRating = 0;
+    private int? hoverRating = null;
+    private bool hasRated = false;
+    private int totalVotes = 28;          // örnek başlangıç
+    private double ratingSum = 28 * 4.4;  // örnek başlangıç
+    private double avgRating => totalVotes == 0 ? 0 : ratingSum / totalVotes;
+
+    // Yorumlar
+    private List<CommentVm> comments = new();
+    private NewCommentVm newComment = new();
+
+    private bool commentsLoading;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalComments = 0;
+
+    private int totalPages => totalComments == 0 ? 0 : (int)Math.Ceiling(totalComments / (double)pageSize);
+    private int shownFrom => totalComments == 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    private int shownTo => Math.Min(currentPage * pageSize, totalComments);
+
+
+    // Şikayet
+    private ReportVm report = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+        _infoMessage = null;
+        product = null;
+
+        try
+        {
+            var detail = await Http.GetFromJsonAsync<ApiResponse<ProductDto>>($"api/recipes/{id}");
+            if (detail is null || !detail.IsSuccess || detail.Data is null)
+            {
+                _errorMessage = detail?.Message ?? "Kayıt bulunamadı.";
+            }
+            else
+            {
+                product = detail.Data;
+                await LoadCommentsAsync(1); // İlk sayfa
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "İstek sırasında hata: " + ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+    private async Task LoadCommentsAsync(int page)
+    {
+        commentsLoading = true;
+        StateHasChanged();
+
+        // Sınırları koru
+        if (page < 1) page = 1;
+        // totalPages henüz bilinmiyorsa (ilk yüklemede) sorun değil.
+
+        try
+        {
+            var res = await Http.GetFromJsonAsync<ApiResponse<PagedResult<CommentDto>>>(
+            $"api/recipes/{id}/comments?page={page}&pageSize={pageSize}&sort=new");
+
+            if (res?.IsSuccess == true && res.Data is not null)
+            {
+                currentPage = res.Data.Page;
+                pageSize = res.Data.PageSize;
+                totalComments = res.Data.TotalCount;
+
+                comments = res.Data.Items.Select(c => new CommentVm
+                {
+                    Name = c.Name,
+                    Text = c.Text,
+                    CreatedAt = c.CreatedAt
+                }).ToList();
+            }
+            else
+            {
+                comments.Clear();
+                totalComments = 0;
+            }
+        }
+        finally
+        {
+            commentsLoading = false;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        // totalPages 0 ise (veri yok) hiç çağırma
+        if (totalPages == 0) return;
+
+        page = Math.Max(1, Math.Min(totalPages, page));
+        await LoadCommentsAsync(page);
+    }
+
+    private async Task ChangePageSize(ChangeEventArgs e)
+    {
+        if (int.TryParse(Convert.ToString(e.Value), out var newSize) && newSize > 0)
+        {
+            pageSize = newSize;
+            await LoadCommentsAsync(1); // başa dön
+        }
+    }
+
+    private IEnumerable<int> VisiblePages()
+    {
+        if (totalPages <= 7)
+        {
+            return Enumerable.Range(1, totalPages);
+        }
+
+        var window = 1; // current +/- 1
+        var pages = new List<int>();
+
+        pages.Add(1);
+        if (currentPage > 2 + window) pages.Add(-1); // …
+
+        var start = Math.Max(2, currentPage - window);
+        var end = Math.Min(totalPages - 1, currentPage + window);
+        for (int p = start; p <= end; p++) pages.Add(p);
+
+        if (currentPage < totalPages - 1 - window) pages.Add(-1); // …
+        pages.Add(totalPages);
+
+        return pages;
+    }
+
+
+    private void ToggleSave()
+    {
+        _saved = !_saved;
+        _infoMessage = _saved ? "Tarif kaydedildi." : "Kaydedilenlerden çıkarıldı.";
+        // TODO: POST/DELETE api/user/save-recipe
+    }
+
+    private void SetRating(int value)
+    {
+        // 1–5 aralığına zorla ve hover'ı temizle
+        var v = Math.Min(5, Math.Max(1, value));
+        hoverRating = null;
+
+        if (!hasRated)
+        {
+            hasRated = true;
+            totalVotes++;
+            ratingSum += v;
+        }
+        else
+        {
+            // Aynı kullanıcı puanını güncelliyor
+            ratingSum -= userRating;
+            ratingSum += v;
+        }
+
+        userRating = v;
+        _infoMessage = $"Puanınız kaydedildi: {userRating}/5";
+        // TODO: POST api/recipe/rate { id, rating: v }
+    }
+
+    private async Task AddComment()
+    {
+        // TODO: gerçek API'ye POST yap
+        // await Http.PostAsJsonAsync($"api/recipes/{id}/comments", new { newComment.Name, newComment.Text });
+
+        newComment = new();
+        _infoMessage = "Yorumunuz eklendi.";
+
+        await LoadCommentsAsync(1);
+    }
+    public record CommentDto(int Id, string? Name, string Text, DateTime CreatedAt);
+    public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
+    public record ProductDetailDto(int Id, string ProductName, string ImageUrl, string ProductDetailedText,
+    double RatingAvg, int RatingCount, int? YourRating, bool IsSavedByYou, int CommentsCount);
+    private void SubmitReport()
+    {
+        if (string.IsNullOrWhiteSpace(report.Reason))
+        {
+            _infoMessage = "Lütfen bir şikayet gerekçesi seçin.";
+            return;
+        }
+
+        _infoMessage = "Şikayetiniz alındı. Teşekkürler.";
+        report = new();
+        // TODO: POST api/recipe/report
+    }
+
+    // VM'ler
+    class CommentVm
+    {
+        public string? Name { get; set; }
+        public string Text { get; set; } = "";
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+    }
+
+    class NewCommentVm
+    {
+        [MaxLength(50)]
+        public string? Name { get; set; }
+
+        [Required, MinLength(2), MaxLength(1000)]
+        public string Text { get; set; } = "";
+    }
+
+    class ReportVm
+    {
+        [Required]
+        public string Reason { get; set; } = "";
+        public string? Details { get; set; }
+    }
+}
+
+<style>
+    .icon-btn {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+    }
+
+    .star {
+        cursor: pointer;
+    }
+
+    .object-fit-cover {
+        object-fit: cover;
+    }
+
+    .min-h-260 {
+        min-height: 260px;
+    }
+
+    .bg-success-subtle {
+        background-color: rgba(25,135,84,.15);
+    }
+</style> *@
+@page "/recipe/{id:int}"
+@inject HttpClient Http
+@inject AuthenticationStateProvider Auth
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else if (_loading)
+{
+    <div>Yükleniyor…</div>
+}
+else if (product is not null)
+{
+    <div class="container my-3 my-lg-4">
+
+        @if (!string.IsNullOrEmpty(_infoMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @_infoMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+            </div>
+        }
+
+        <!-- === KART: SOLDA RESİM / SAĞDA DETAY === -->
+        <div class="card mb-4">
+            <div class="row g-0 align-items-stretch">
+                <!-- SOL: GÖRSEL -->
+                <div class="col-md-5 col-lg-4">
+                    <img class="w-100 h-100 object-fit-cover rounded-start min-h-260"
+                         src="@product.ImageUrl" alt="@product.ProductName">
+                </div>
+
+                <!-- SAĞ: BAŞLIK + BUTONLAR + METİN + PUANLAMA -->
+                <div class="col-md-7 col-lg-8 position-relative">
+                    <div class="p-3 p-lg-4">
+                        <div class="d-flex align-items-start">
+                            <h1 class="h2 mb-0 me-auto">@product.ProductName</h1>
+
+                            <!-- Kısayol ikonları -->
+                            <div class="d-flex gap-2 ms-3">
+                                <button class="btn btn-light rounded-circle shadow-sm icon-btn"
+                                        title="@(_saved ? "Kaydedildi" : "Kaydet")"
+                                        @onclick="ToggleSave">
+                                    <i class="@(_saved ? "bi bi-bookmark-fill" : "bi bi-bookmark") fs-5"></i>
+                                </button>
+
+                                <button class="btn btn-light rounded-circle shadow-sm icon-btn"
+                                        title="Tarifi Şikayet Et"
+                                        data-bs-toggle="modal" data-bs-target="#reportModal">
+                                    <i class="bi bi-flag fs-5"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="text-body mt-3 mb-4">@product.ProductDetailedText</p>
+
+                        <!-- Puanlama -->
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <span class="fw-semibold me-1">Puanla:</span>
+                            @for (var i = 1; i <= 5; i++)
+                            {
+                                var star = i; // <- closure fix: i’nin kopyası
+                                var filled = ((hoverRating ?? userRating) >= star);
+
+                                <i class="@(filled ? "bi bi-star-fill" : "bi bi-star") fs-4 star"
+                                   role="button" tabindex="0"
+                                   @onmouseover="() => hoverRating = star"
+                                   @onmouseout="() => hoverRating = null"
+                                   @onclick="() => SetRating(star)"></i>
+                            }
+
+                            <small class="text-muted ms-2">
+                                Ortalama: @avgRating.ToString("0.0") / 5 (@totalVotes oy)
+                            </small>
+                            @if (hasRated)
+                            {
+                                <span class="badge bg-success-subtle text-success ms-2">
+                                    Puanınız: @userRating
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === YORUMLAR === -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="bi bi-chat-dots me-2"></i>
+                    Yorumlar <span class="text-muted">(@totalComments)</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted">Göster:</small>
+                    <select class="form-select form-select-sm w-auto"
+                            @onchange="ChangePageSize">
+                        <option value="5" selected="@(pageSize == 5)">5</option>
+                        <option value="10" selected="@(pageSize == 10)">10</option>
+                        <option value="20" selected="@(pageSize == 20)">20</option>
+                        <option value="50" selected="@(pageSize == 50)">50</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card-body">
+                @if (commentsLoading)
+                {
+                    <div class="text-muted">Yorumlar yükleniyor…</div>
+                }
+                else if (comments.Count == 0)
+                {
+                    <div class="text-muted">Bu tarife henüz yorum yapılmamış. İlk yorumu sen yaz! ✍️</div>
+                }
+                else
+                {
+                    <div class="vstack gap-3">
+                        @foreach (var c in comments)
+                        {
+                            <div class="border rounded p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <strong>@(string.IsNullOrWhiteSpace(c.Name) ? "Anonim" : c.Name)</strong>
+                                    <small class="text-muted">@c.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                                </div>
+                                <div>@c.Text</div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Alt bilgi + sayfalama -->
+                    <div class="d-flex align-items-center justify-content-between mt-3">
+                        <small class="text-muted">
+                            Gösterilen @shownFrom–@shownTo / @totalComments
+                        </small>
+
+                        @if (totalPages > 1)
+                        {
+                            <nav aria-label="Yorum sayfalama">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item @(currentPage == 1 ? "disabled" : null)">
+                                        <button type="button" class="page-link"
+                                                @onclick="() => GoToPage(currentPage - 1)">
+                                            Önceki
+                                        </button>
+                                    </li>
+
+                                    @foreach (var p in VisiblePages())
+                                    {
+                                        if (p == -1)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                                        }
+                                        else
+                                        {
+                                            <li class="page-item @(p == currentPage ? "active" : null)">
+                                                <button type="button" class="page-link"
+                                                        @onclick="() => GoToPage(p)">
+                                                    @p
+                                                </button>
+                                            </li>
+                                        }
+                                    }
+
+                                    <li class="page-item @(currentPage == totalPages ? "disabled" : null)">
+                                        <button type="button" class="page-link"
+                                                @onclick="() => GoToPage(currentPage + 1)">
+                                            Sonraki
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
+                }
+
+                <hr class="my-4" />
+
+                <!-- Yorum Ekle -->
+                <EditForm Model="@newComment" OnValidSubmit="@AddComment">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <InputText class="form-control" placeholder=@usera?.FindFirst(ClaimTypes.Name)?.Value disabled />
+                        </div>
+                        <div class="col-md-9">
+                            <InputTextArea class="form-control" rows="3" @bind-Value="newComment.Text" placeholder="Yorumunuz" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-send me-1"></i> Gönder
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <!-- === ŞİKAYET MODAL === -->
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-flag me-2 text-danger"></i>Tarifi Şikayet Et</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+
+                <EditForm Model="@report" OnValidSubmit="@SubmitReport">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Gerekçe</label>
+                            <InputRadioGroup @bind-Value="report.Reason">
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Yanıltıcı içerik") />
+                                    <label class="form-check-label">Yanıltıcı içerik</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Uygunsuz / rahatsız edici") />
+                                    <label class="form-check-label">Uygunsuz / rahatsız edici</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Telif / ihlal") />
+                                    <label class="form-check-label">Telif / hak ihlali</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputRadio class="form-check-input" Value=@("Spam / Reklam") />
+                                    <label class="form-check-label">Spam / reklam</label>
+                                </div>
+                            </InputRadioGroup>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Açıklama (opsiyonel)</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="report.Details" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                        <button type="submit" class="btn btn-danger" data-bs-dismiss="modal">
+                            <i class="bi bi-flag me-1"></i> Gönder
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+
+    private string? _errorMessage;
+    private string? _infoMessage;
+    private ProductDto? product;
+    private bool _loading;
+
+    // Kaydet
+    private bool _saved;
+
+    // Puanlama
+    private int userRating = 0;
+    private int? hoverRating = null;
+    private bool hasRated = false;
+    private int totalVotes = 28;          // örnek başlangıç
+    private double ratingSum = 28 * 4.4;  // örnek başlangıç
+    private double avgRating => totalVotes == 0 ? 0 : ratingSum / totalVotes;
+
+    // Yorumlar
+    private List<CommentVm> comments = new();
+    private NewCommentVm newComment = new();
+
+    private bool commentsLoading;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalComments = 0;
+
+    private int totalPages => totalComments == 0 ? 0 : (int)Math.Ceiling(totalComments / (double)pageSize);
+    private int shownFrom => totalComments == 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    private int shownTo => Math.Min(currentPage * pageSize, totalComments);
+
+
+    // Şikayet
+    private ReportVm report = new();
+    ClaimsPrincipal? usera;
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+        _infoMessage = null;
+        product = null;
+
+        try
+        {
+            var detail = await Http.GetFromJsonAsync<ApiResponse<ProductDto>>($"api/Recipe/GetDetailedRecipe/{id}");
+            if (detail is null || !detail.IsSuccess || detail.Data is null)
+            {
+                _errorMessage = detail?.Message ?? "Kayıt bulunamadı.";
+            }
+            else
+            {
+                product = detail.Data;
+                await LoadCommentsAsync(1); // İlk sayfa
+                usera = (await Auth.GetAuthenticationStateAsync()).User;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "İstek sırasında hata: " + ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+    private async Task LoadCommentsAsync(int page)
+    {
+        commentsLoading = true;
+        StateHasChanged();
+
+        // Sınırları koru
+        if (page < 1) page = 1;
+        // totalPages henüz bilinmiyorsa (ilk yüklemede) sorun değil.
+
+        try
+        {
+            var res = await Http.GetFromJsonAsync<ApiResponse<PagedResult<CommentDto>>>(
+            $"api/Recipe/{id}/comments?page={page}&pageSize={pageSize}&sort=new");
+
+            if (res?.IsSuccess == true && res.Data is not null)
+            {
+                currentPage = res.Data.Page;
+                pageSize = res.Data.PageSize;
+                totalComments = res.Data.TotalCount;
+
+                comments = res.Data.Items.Select(c => new CommentVm
+                {
+                    Name = c.UserDisplayName,
+                    Text = c.Text,
+                    CreatedAt = c.CreatedAt
+                }).ToList();
+            }
+            else
+            {
+                comments.Clear();
+                totalComments = 0;
+            }
+        }
+        finally
+        {
+            commentsLoading = false;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        // totalPages 0 ise (veri yok) hiç çağırma
+        if (totalPages == 0 && page != 1) return;
+
+        page = Math.Max(1, Math.Min(totalPages > 0 ? totalPages : 1, page));
+        await LoadCommentsAsync(page);
+    }
+
+    private async Task ChangePageSize(ChangeEventArgs e)
+    {
+        if (int.TryParse(Convert.ToString(e.Value), out var newSize) && newSize > 0)
+        {
+            pageSize = newSize;
+            await LoadCommentsAsync(1); // başa dön
+        }
+    }
+
+    private IEnumerable<int> VisiblePages()
+    {
+        if (totalPages <= 7)
+        {
+            return Enumerable.Range(1, totalPages);
+        }
+
+        var window = 1; // current +/- 1
+        var pages = new List<int>();
+
+        pages.Add(1);
+        if (currentPage > 2 + window) pages.Add(-1); // …
+
+        var start = Math.Max(2, currentPage - window);
+        var end = Math.Min(totalPages - 1, currentPage + window);
+        for (int p = start; p <= end; p++) pages.Add(p);
+
+        if (currentPage < totalPages - 1 - window) pages.Add(-1); // …
+        pages.Add(totalPages);
+
+        return pages;
+    }
+
+
+    private void ToggleSave()
+    {
+        _saved = !_saved;
+        _infoMessage = _saved ? "Tarif kaydedildi." : "Kaydedilenlerden çıkarıldı.";
+        // TODO: POST/DELETE api/user/save-recipe
+    }
+
+    private void SetRating(int value)
+    {
+        // 1–5 aralığına zorla ve hover'ı temizle
+        var v = Math.Min(5, Math.Max(1, value));
+        hoverRating = null;
+
+        if (!hasRated)
+        {
+            hasRated = true;
+            totalVotes++;
+            ratingSum += v;
+        }
+        else
+        {
+            // Aynı kullanıcı puanını güncelliyor
+            ratingSum -= userRating;
+            ratingSum += v;
+        }
+
+        userRating = v;
+        _infoMessage = $"Puanınız kaydedildi: {userRating}/5";
+        // TODO: POST api/recipe/rate { id, rating: v }
+    }
+
+    private async Task AddComment()
+    {
+        // TODO: gerçek API'ye POST yap
+        // await Http.PostAsJsonAsync($"api/recipes/{id}/comments", new { newComment.Name, newComment.Text });
+
+        newComment = new();
+        _infoMessage = "Yorumunuz eklendi.";
+
+        await LoadCommentsAsync(1);
+    }
+    public record ProductDto(int Id, string ProductName, string ImageUrl, string ProductDetailedText,
+    double RatingAvg, int RatingCount, int? YourRating, bool IsSavedByYou, int CommentsCount);
+    private void SubmitReport()
+    {
+        if (string.IsNullOrWhiteSpace(report.Reason))
+        {
+            _infoMessage = "Lütfen bir şikayet gerekçesi seçin.";
+            return;
+        }
+
+        _infoMessage = "Şikayetiniz alındı. Teşekkürler.";
+        report = new();
+        // TODO: POST api/recipe/report
+    }
+
+    // VM'ler
+    class CommentVm
+    {
+        public string? Name { get; set; }
+        public string Text { get; set; } = "";
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+    }
+
+    class NewCommentVm
+    {
+        [MaxLength(50)]
+        public string? Name { get; set; }
+
+        [Required, MinLength(2), MaxLength(1000)]
+        public string Text { get; set; } = "";
+    }
+
+    class ReportVm
+    {
+        [Required]
+        public string Reason { get; set; } = "";
+        public string? Details { get; set; }
+    }
+}
+
+<style>
+    .icon-btn {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+    }
+
+    .star {
+        cursor: pointer;
+    }
+
+    .object-fit-cover {
+        object-fit: cover;
+    }
+
+    .min-h-260 {
+        min-height: 260px;
+    }
+
+    .bg-success-subtle {
+        background-color: rgba(25,135,84,.15);
+    }
+</style>

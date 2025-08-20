@@ -1,0 +1,72 @@
+﻿@page "/recipe/search"
+@inject HttpClient Http
+@using RecipeBookProject.Client.Shared
+
+<PageTitle>Search</PageTitle>
+
+<div class="container">
+    <h1 class="mb-4" style="text-align:center; padding:20px;">Tarifler</h1>
+
+    @if (categoryListe is not null)
+    {
+        @for (int i = 0; i < categoryListe.Count; i++)
+        {
+            var cat = categoryListe[i];
+            var items = allProductSlider[i];
+            if (items.Count == 0) continue;
+
+            <ProductSlider Title="@cat.CategoryName" Items="@items" />
+            <div style="margin-top:50px;"></div>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "query")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public int? Category { get; set; }
+
+    private List<ProductDto>? liste;
+    private List<List<ProductSlider.ProductCard>> allProductSlider = new();
+    private List<CategoryDto>? categoryListe;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
+        categoryListe = response2?.Data ?? new List<CategoryDto>();
+
+
+        var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>(
+          $"api/recipe/search?query={Uri.EscapeDataString(Query ?? "")}&category={Category}");
+        liste = response?.Data ?? new List<ProductDto>();
+
+        var catIndex = new Dictionary<int, int>();
+
+        for (int i = 0; i < categoryListe.Count; i++)
+        {
+            allProductSlider.Add(new List<ProductSlider.ProductCard>());
+            catIndex[categoryListe[i].CategoryId] = i;
+        }
+
+        foreach (var item in liste)
+        {
+            var catId = item.Category?.CategoryId;
+            if (catId is null) continue;
+
+            if (catIndex.TryGetValue(catId.Value, out var idx))
+            {
+                allProductSlider[idx].Add(new ProductSlider.ProductCard
+                {
+                    ImageUrl = item.ImageUrl,
+                    Title = item.ProductName,
+                    ProductId = item.ProductId,
+                    Description = item.ProductShortDesc,
+                    ProductionTime = item.ProductionTime,
+                    Footer = $"Kategori: {item.Category?.CategoryName}"
+                });
+            }
+        }
+    }
+}

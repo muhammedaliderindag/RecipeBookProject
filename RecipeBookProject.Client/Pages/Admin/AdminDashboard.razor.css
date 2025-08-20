@@ -1,0 +1,105 @@
+﻿:root {
+    --brand: #0d6efd; /* bootstrap primary */
+    --accent: #5b8dee; /* daha yumuşak mavi ton */
+}
+
+.admin-wrap .card {
+    border: 0;
+    border-radius: 1rem;
+}
+
+.kpi-card .iconwrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, rgba(13,110,253,.12), rgba(13,110,253,.04));
+    color: var(--brand);
+    flex: 0 0 auto;
+}
+
+.kpi-title {
+    font-size: .85rem;
+}
+
+.kpi-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.kpi-trend.up {
+    color: #198754;
+}
+
+.kpi-trend.down {
+    color: #dc3545;
+}
+
+.chart-area {
+    height: 220px;
+    border-radius: .75rem;
+    background: linear-gradient(180deg, rgba(13,110,253,.06), rgba(13,110,253,0));
+    padding: .25rem;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: .6rem;
+    height: .6rem;
+    border-radius: 50%;
+    background: var(--brand);
+    vertical-align: middle;
+}
+
+.donut-wrap {
+    position: relative;
+    width: 220px;
+    height: 220px;
+}
+
+.donut {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient( #2d7ef7 0 34%, #7aa9ff 34% 60%, #b2c8ff 60% 78%, #6fc2ff 78% 100% );
+    box-shadow: inset 0 0 0 40px #fff; /* iç boşluk */
+    margin: 0 auto;
+}
+
+.donut-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+}
+
+.legend-swatch {
+    width: .8rem;
+    height: .8rem;
+    border-radius: .2rem;
+    display: inline-block;
+}
+
+.sw1 {
+    background: #2d7ef7;
+}
+
+.sw2 {
+    background: #7aa9ff;
+}
+
+.sw3 {
+    background: #b2c8ff;
+}
+
+.sw4 {
+    background: #6fc2ff;
+}
+
+/* Offcanvas yuvarlatma */
+.offcanvas {
+    border-radius: 1rem 0 0 1rem;
+}

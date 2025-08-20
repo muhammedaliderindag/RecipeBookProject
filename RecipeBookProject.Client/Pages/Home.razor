@@ -1,7 +1,106 @@
 ﻿@page "/"
+@inject NavigationManager Nav
+@inject HttpClient Http
+@using System.Linq
 
-<PageTitle>Home</PageTitle>
+<div class="container py-4">
+    <h1 class="h4 fw-semibold mb-2">Tarifler</h1>
+    <p class="text-muted mb-4">Hızlıca ara, kategoriden seç ya da trendlere göz at.</p>
 
-<h1>Hello, world!</h1>
+    <div class="input-group input-group-lg mb-4">
+        <select class="form-select" @bind="seciliKategori" aria-label="Kategori">
+            <option value="">Tüm Kategoriler</option>
+            @foreach (var k in categoryListe)
+            {
+                <option value="@k.CategoryId">@k.CategoryName</option>
+            }
+        </select>
 
-Welcome to your new app.
+        <input class="form-control" placeholder="Tarif, malzeme ara…"
+               @bind="arama" @onkeydown="EnterAra" />
+        <button class="btn btn-primary" @onclick="Ara">Ara</button>
+    </div>
+
+    <h2 class="h5 mb-3">Kategoriler</h2>
+    <div class="row g-3 mb-4">
+        @foreach (var k in categoryListe)
+        {
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="#" class="card card-body text-center shadow-sm h-100"
+                   @onclick="() => KategoriGit(k.CategoryId)" @onclick:preventDefault>
+                    <div class="fw-semibold">@k.CategoryName</div>
+                </a>
+            </div>
+        }
+    </div>
+
+    <!-- Trend Tarifler -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h5 m-0">Trend Tarifler</h2>
+        <button class="btn btn-primary"><NavLink class="text-decoration-none" style="color:white;" href="/recipe">Daha Fazla</NavLink></button>
+    </div>
+
+    <div class="row g-3">
+        @{
+            // liste null ise boş listeyle devam et
+            var items = (liste)
+            .Where(x => x != null && x.FeaturedCategory != null && x.FeaturedCategory.FeaturedCategoryId == 1)
+            .Take(3)
+            .ToList();
+        }
+
+        @foreach (var item in items)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm">
+                    <img src="@item.ImageUrl" class="card-img-top" alt="@item.ProductName" loading="lazy" />
+                    <div class="card-body">
+                        <div class="small text-muted mb-1">
+                            @item.Category?.CategoryName • @item.ProductionTime dk
+                        </div>
+                        <h5 class="card-title">@item.ProductName</h5>
+                        <p class="card-text text-muted small">@item.ProductShortDesc</p>
+                        <NavLink class="btn btn-outline-primary btn-sm" href="@($"/recipe/{item.ProductId}")">Tarife Git</NavLink>
+                        @* Blazor değilse NavLink yerine <a> kullan:
+                       <a class="btn btn-outline-primary btn-sm" href="@($"/recipe/{item.ProductId}")">Tarife Git</a> *@
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string? arama;
+    private int? seciliKategori;
+    private List<ProductDto> liste = new List<ProductDto>();
+    private List<CategoryDto> categoryListe = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>("api/Recipe/getShortRecipes");
+        liste = response?.Data ?? new List<ProductDto>();
+
+        var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
+        categoryListe = response2?.Data ?? new List<CategoryDto>();
+        
+    }
+
+    private void EnterAra(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Ara();
+    }
+
+    private void Ara()
+    {
+        var url = $"recipe/search?query={Uri.EscapeDataString(arama ?? "")}&category={seciliKategori}";
+        Nav.NavigateTo(url);
+    }
+
+    private void KategoriGit(int k)
+    {
+        seciliKategori = k;
+        Ara();
+    }
+
+}

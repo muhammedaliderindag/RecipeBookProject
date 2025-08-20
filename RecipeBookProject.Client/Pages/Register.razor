@@ -1,0 +1,59 @@
+﻿@page "/register"
+@using RecipeBookProject.Client.Services
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+
+<h3>Register</h3>
+
+<div class="card">
+    <div class="card-body">
+        <EditForm Model="@_registerRequest" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label>Email</label>
+                <InputText class="form-control" @bind-Value="_registerRequest.Email" />
+                <ValidationMessage For="@(() => _registerRequest.Email)" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <InputText type="password" class="form-control" @bind-Value="_registerRequest.PasswordHashed" />
+                <ValidationMessage For="@(() => _registerRequest.PasswordHashed)" />
+            </div>
+            <div class="form-group">
+                <label>İsim</label>
+                <InputText type="text" class="form-control" @bind-Value="_registerRequest.FirstName" />
+                <ValidationMessage For="@(() => _registerRequest.FirstName)" />
+            </div>
+            <div class="form-group">
+                <label>Soyisim</label>
+                <InputText type="text" class="form-control" @bind-Value="_registerRequest.LastName" />
+                <ValidationMessage For="@(() => _registerRequest.LastName)" />
+            </div>
+            <br />
+            <button type="submit" class="btn btn-primary">Register</button>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@_errorMessage</div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private RegisterRequestDto _registerRequest = new RegisterRequestDto();
+    private string _errorMessage;
+
+    private async Task HandleLogin()
+    {
+        var result = await AuthService.RegisterAsync(_registerRequest);
+        if (result)
+        {
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            _errorMessage = "Kayıt başarısız. Lütfen bilgilerinizi kontrol edin.";
+        }
+    }
+}

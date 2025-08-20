@@ -1,0 +1,341 @@
+﻿@page "/admin"
+@using System.Globalization
+
+<!-- Erişilebilirlik -->
+<h1 class="visually-hidden">Yönetim Paneli</h1>
+
+<div class="container-fluid p-3 p-lg-4 admin-wrap">
+    <!-- Üst Başlık + Aksiyonlar -->
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <div class="me-auto">
+            <h2 class="h4 mb-1">Yönetim Paneli</h2>
+            <div class="text-body-secondary small">
+                Tarifler • Onay kuyruğu • Taslaklar • Şikayetler
+            </div>
+        </div>
+
+        <button class="btn btn-outline-secondary" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#filters">
+            <i class="bi bi-funnel me-1"></i>Filtreler
+        </button>
+
+        <a class="btn btn-outline-primary" href="#">
+            <i class="bi bi-clipboard-check me-1"></i>Onay Kuyruğu
+        </a>
+
+        <a class="btn btn-primary" href="#">
+            <i class="bi bi-plus-lg me-1"></i>Yeni Tarif
+        </a>
+    </div>
+
+    <!-- KPI Kartları -->
+    <div class="row g-3 mb-3">
+        @foreach (var kpi in Kpis)
+        {
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card kpi-card h-100 shadow-sm">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="iconwrap">
+                            <i class="@kpi.Icon"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="kpi-title text-body-secondary">@kpi.Title</div>
+                            <div class="kpi-value">@kpi.Value.ToString("N0", CultureInfo.GetCultureInfo("tr-TR"))</div>
+                            <div class="kpi-trend @((kpi.Trend >= 0) ? "up" : "down")">
+                                <i class="bi @(kpi.Trend >= 0 ? "bi-arrow-up-right" : "bi-arrow-down-right") me-1"></i>
+                                @Math.Abs(kpi.Trend).ToString("0.#")%
+                                <span class="text-body-secondary ms-1">haftalık</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Grafik Bölümü (statik placeholder) -->
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+                    <span class="fw-medium">Haftalık Tarif Yayınları</span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active">7G</button>
+                        <button class="btn btn-outline-secondary">30G</button>
+                        <button class="btn btn-outline-secondary">90G</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Basit SVG area chart placeholder -->
+                    <div class="chart-area">
+                        <svg viewBox="0 0 100 36" preserveAspectRatio="none" class="w-100 h-100">
+                            <defs>
+                                <linearGradient id="grad" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="var(--brand)" stop-opacity="0.35" />
+                                    <stop offset="100%" stop-color="var(--brand)" stop-opacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <!-- grid -->
+                            <g stroke="currentColor" opacity=".1">
+                                <line x1="0" y1="35" x2="100" y2="35" />
+                                <line x1="0" y1="26" x2="100" y2="26" />
+                                <line x1="0" y1="17" x2="100" y2="17" />
+                                <line x1="0" y1="8" x2="100" y2="8" />
+                            </g>
+                            <!-- area -->
+                            <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9 L100,35 L0,35 Z"
+                                  fill="url(#grad)" />
+                            <!-- line -->
+                            <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9"
+                                  fill="none" stroke="var(--brand)" stroke-width="1.5" />
+                        </svg>
+                    </div>
+                    <div class="d-flex gap-3 small text-body-secondary mt-2">
+                        <div><span class="legend-dot me-1"></span> Yayınlanan</div>
+                        <div>Ort.: <span class="text-body fw-semibold">124 / hafta</span></div>
+                        <div>Tepe: <span class="text-body fw-semibold">176</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Donut (CSS conic-gradient placeholder) -->
+        <div class="col-12 col-xl-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent">
+                    <span class="fw-medium">Kategori Dağılımı</span>
+                </div>
+                <div class="card-body">
+                    <div class="donut-wrap mx-auto my-2">
+                        <div class="donut"></div>
+                        <div class="donut-center">
+                            <div class="h6 mb-0">Toplam</div>
+                            <div class="fw-bold">2.438</div>
+                        </div>
+                    </div>
+                    <ul class="list-unstyled small mb-0">
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span class="legend-swatch sw1"></span> Ana Yemekler <span class="ms-auto fw-semibold">34%</span>
+                        </li>
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span class="legend-swatch sw2"></span> Tatlılar <span class="ms-auto fw-semibold">26%</span>
+                        </li>
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span class="legend-swatch sw3"></span> Çorbalar <span class="ms-auto fw-semibold">18%</span>
+                        </li>
+                        <li class="d-flex align-items-center gap-2">
+                            <span class="legend-swatch sw4"></span> Vejetaryen <span class="ms-auto fw-semibold">22%</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tablo & listeler -->
+    <div class="row g-3">
+        <div class="col-12 col-xxl-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+                    <span class="fw-medium">Onay Bekleyen Tarifler</span>
+                    <a href="#" class="small">Tümünü gör <i class="bi bi-arrow-right-short"></i></a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tarif</th>
+                                <th>Yazar</th>
+                                <th>Tarih</th>
+                                <th class="text-center">Puan</th>
+                                <th class="text-center">Şikayet</th>
+                                <th class="text-end">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in Pending)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="@r.ThumbUrl" class="rounded me-2" style="width:36px;height:36px;object-fit:cover;" alt="">
+                                            <div>
+                                                <div class="fw-medium">@r.Title</div>
+                                                <div class="text-body-secondary small">@r.Category</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@r.Author</td>
+                                    <td>@r.DateAdded.ToString("dd.MM.yyyy")</td>
+                                    <td class="text-center">@r.Rating.ToString("0.0")</td>
+                                    <td class="text-center">
+                                        @if (r.ReportCount > 0)
+                                        {
+                                            <span class="badge text-bg-danger-subtle border border-danger-subtle">@r.ReportCount</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-body-secondary">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a class="btn btn-outline-success" href="#"><i class="bi bi-check2"></i></a>
+                                            <a class="btn btn-outline-warning" href="#"><i class="bi bi-pencil"></i></a>
+                                            <a class="btn btn-outline-danger" href="#"><i class="bi bi-x"></i></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-transparent d-flex justify-content-end">
+                    <nav aria-label="Sayfalama">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item disabled"><span class="page-link">Önceki</span></li>
+                            <li class="page-item active"><span class="page-link">1</span></li>
+                            <li class="page-item"><a class="page-link" href="#">2</a></li>
+                            <li class="page-item"><a class="page-link" href="#">3</a></li>
+                            <li class="page-item"><a class="page-link" href="#">Sonraki</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xxl-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent fw-medium">Raporlananlar</div>
+                <div class="list-group list-group-flush">
+                    @foreach (var x in Reported)
+                    {
+                        <a href="#" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+                            <i class="bi bi-flag text-danger mt-1"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-medium">@x.Title</div>
+                                <div class="small text-body-secondary">@x.Reason</div>
+                            </div>
+                            <span class="badge text-bg-danger-subtle border border-danger-subtle">@x.Count</span>
+                        </a>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent fw-medium">Son Yorumlar</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var c in Comments)
+                    {
+                        <li class="list-group-item">
+                            <div class="d-flex align-items-start gap-2">
+                                <img src="@c.Avatar" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;" alt="">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex">
+                                        <div class="fw-medium me-auto">@c.Author</div>
+                                        <span class="text-body-secondary small">@c.Date.ToString("dd.MM.yyyy")</span>
+                                    </div>
+                                    <div class="small">@c.Text</div>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Offcanvas Filtreler -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="filters" aria-labelledby="filtersLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="filtersLabel">Filtreler</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Kapat"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="mb-3">
+            <label class="form-label">Durum</label>
+            <select class="form-select">
+                <option>Tümü</option>
+                <option>Onay Bekleyen</option>
+                <option>Yayında</option>
+                <option>Taslak</option>
+                <option>Şikayetli</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Kategori</label>
+            <select class="form-select">
+                <option>Tümü</option>
+                <option>Ana Yemekler</option>
+                <option>Tatlılar</option>
+                <option>Çorbalar</option>
+                <option>Vejetaryen</option>
+            </select>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col">
+                <label class="form-label">Başlangıç</label>
+                <input type="date" class="form-control" />
+            </div>
+            <div class="col">
+                <label class="form-label">Bitiş</label>
+                <input type="date" class="form-control" />
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Şikayet Türü</label>
+            <select class="form-select">
+                <option>Hepsi</option>
+                <option>Uygunsuz Dil</option>
+                <option>Yanıltıcı</option>
+                <option>Telif</option>
+                <option>Spam</option>
+            </select>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary"><i class="bi bi-search me-1"></i>Uygula</button>
+            <button class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Temizle</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    // --- Statik veriler (placeholder) ---
+    record Kpi(string Title, int Value, double Trend, string Icon);
+    List<Kpi> Kpis = new()
+    {
+        new("Toplam Tarif", 2438, +4.2, "bi bi-book"),
+        new("Onay Bekleyen", 37, -1.8, "bi bi-hourglass-split"),
+        new("Taslak", 112, +0.7, "bi bi-file-earmark-text"),
+        new("Şikayetli", 9, +2.1, "bi bi-flag")
+    };
+
+    record PendingItem(string Title, string Category, string Author, DateTime DateAdded, double Rating, int ReportCount, string ThumbUrl);
+    List<PendingItem> Pending = new()
+    {
+        new("Kremalı Mantar Soslu Makarna", "Ana Yemekler", "elif.k", DateTime.Today.AddDays(-1), 4.7, 0, "https://picsum.photos/seed/p1/80/80"),
+        new("Fırında Sütlaç", "Tatlılar", "murat.c", DateTime.Today.AddDays(-2), 4.9, 2, "https://picsum.photos/seed/p2/80/80"),
+        new("Domates Çorbası", "Çorbalar", "asli.d", DateTime.Today.AddDays(-3), 4.3, 0, "https://picsum.photos/seed/p3/80/80"),
+        new("Sebzeli Kuskus", "Vejetaryen", "okan.t", DateTime.Today.AddDays(-3), 4.1, 1, "https://picsum.photos/seed/p4/80/80"),
+        new("Islak Kek", "Tatlılar", "irem.s", DateTime.Today.AddDays(-4), 4.8, 0, "https://picsum.photos/seed/p5/80/80"),
+        new("Tavuklu Wrap", "Ana Yemekler", "yagiz.b", DateTime.Today.AddDays(-5), 4.5, 3, "https://picsum.photos/seed/p6/80/80"),
+    };
+
+    record ReportedItem(string Title, string Reason, int Count);
+    List<ReportedItem> Reported = new()
+    {
+        new("Acılı Sos Tarifi", "Uygunsuz dil", 2),
+        new("Kolay Cheesecake", "Telif ihlali", 1),
+        new("Sihirli Diyet Çorbası", "Yanıltıcı içerik", 3)
+    };
+
+    record CommentItem(string Author, string Text, DateTime Date, string Avatar);
+    List<CommentItem> Comments = new()
+    {
+        new("zeynep.oz", "Tarifteki ölçüler çok net, teşekkürler!", DateTime.Today.AddDays(-1), "https://i.pravatar.cc/60?img=12"),
+        new("bora.ak", "Fotoğraflar harika görünüyor.", DateTime.Today.AddDays(-2), "https://i.pravatar.cc/60?img=16"),
+        new("melis.t", "Vejetaryen alternatifi de eklenebilir mi?", DateTime.Today.AddDays(-3), "https://i.pravatar.cc/60?img=28")
+    };
+}

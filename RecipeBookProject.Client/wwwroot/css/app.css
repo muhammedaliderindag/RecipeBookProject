@@ -1,5 +1,6 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: #ffffff;
 }
 
 h1:focus {
@@ -111,4 +112,62 @@ code {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* Kapsayýcý */
+.slider-wrap {
+    position: relative;
+}
+
+/* Görünen alan */
+.slider-row {
+    overflow: hidden; /* scrollbar gizli */
+    width: 100%;
+}
+
+/* Ýç hat (flex) */
+.slider-track {
+    display: flex;
+    gap: 1rem;
+    scroll-behavior: smooth; /* ek güvence */
+}
+
+/* Her kart: 4 sütun görünür olacak þekilde geniþlik hesapla */
+.slider-card {
+    flex: 0 0 calc((100% - 3rem) / 4); /* 4 kart + 3 gap */
+}
+
+/* Daha küçük ekranlar için kýrýlýmlar */
+@media (max-width: 992px) { /* lg altý: 3 kart */
+    .slider-card {
+        flex-basis: calc((100% - 2rem) / 3);
+    }
+}
+
+@media (max-width: 768px) { /* md altý: 2 kart */
+    .slider-card {
+        flex-basis: calc((100% - 1rem) / 2);
+    }
+}
+
+@media (max-width: 576px) { /* sm altý: 1 kart */
+    .slider-card {
+        flex-basis: 100%;
+    }
+}
+
+
+
+.card-img-top {
+    height: 160px;
+    object-fit: cover;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.card {
+    border-radius: 14px;
+}
+
+.input-group > .form-select {
+    max-width: 200px;
 }

@@ -1,0 +1,54 @@
+﻿@using System.Globalization
+@inject IJSRuntime JS
+
+<div class="slider-wrap">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h3 class="m-0">@Title</h3>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => Scroll(-1)" aria-label="Sola kaydır"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => Scroll(1)" aria-label="Sağa kaydır"><i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <div id="@_containerId" class="slider-row">
+        <div class="slider-track">
+            @foreach (var item in Items)
+            {
+                
+                <div class="slider-card">
+                    <div class="col-12">
+                                <div class="card h-100 shadow-sm">
+                            <img src="@item.ImageUrl" class="card-img-top" alt="@item.Title" loading="lazy" />
+                                    <div class="card-body">
+                                <div class="small text-muted mb-1">@item.Footer • @item.ProductionTime dk</div>
+                                <h5 class="card-title">@item.Title</h5>
+                                <p class="card-text text-muted small">@item.Description</p>
+                                <NavLink class="btn btn-outline-primary btn-sm" href="@($"recipe/{item.ProductId}")">Tarife Git</NavLink>
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+                
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly string _containerId = $"slider_{Guid.NewGuid():N}";
+    [Parameter] public string Title { get; set; } = "Kategori";
+    [Parameter] public List<ProductCard> Items { get; set; } = new();
+
+    private async Task Scroll(int dir)
+        => await JS.InvokeVoidAsync("slider.scrollRowByPage", _containerId, dir);
+
+    public class ProductCard
+    {
+        public string ImageUrl { get; set; } = "";
+        public string Title { get; set; } = "";
+        public int? ProductId { get; set; } = null;
+        public int? ProductionTime { get; set; } = null;
+        public string Description { get; set; } = "";
+        public string? Footer { get; set; }
+    }
+}
