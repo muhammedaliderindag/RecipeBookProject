@@ -11,9 +11,14 @@ namespace RecipeBookProject.DataAccess.Repositories.Abstract
     {
        Task<List<Product>> GetAllShortRecipeRepositoryAsync();
        Task<List<Product>> GetSearchedProductsRepository(string query,int? categoryid);
+       Task<List<Product>> GetSearchedProductsRepositoryAsync(int? categoryid);
        Task<List<Category>> GetAllCategoriesRepository();
        Task AddAsync(User model);
        Task<Product?> GetDetailedRecipeRepository(int productId);
+       Task<bool> SaveRecipeRepositoryAsync(int userId, int productId, bool isSaved);
+       Task<bool> VoteRecipeRepositoryAsync(int userId, int productId, int vote);
+       Task<bool> GetSavedRecipeRepositoryAsync(int userId, int productId);
+       Task<(int totalVoters, double avg, int? userVote)> GetVotedRecipeRepositoryAsync(int userId, int productId);
        Task<IQueryable<Comment>> GetProductCommentsRepositoryAsync(int id);
     }
 }

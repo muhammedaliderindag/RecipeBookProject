@@ -6,7 +6,10 @@
 <div class="container py-4">
     <h1 class="h4 fw-semibold mb-2">Tarifler</h1>
     <p class="text-muted mb-4">Hızlıca ara, kategoriden seç ya da trendlere göz at.</p>
-
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
     <div class="input-group input-group-lg mb-4">
         <select class="form-select" @bind="seciliKategori" aria-label="Kategori">
             <option value="">Tüm Kategoriler</option>
@@ -17,7 +20,9 @@
         </select>
 
         <input class="form-control" placeholder="Tarif, malzeme ara…"
-               @bind="arama" @onkeydown="EnterAra" />
+               @bind="arama"
+               @bind:event="oninput"
+               @onkeydown="EnterAra" />
         <button class="btn btn-primary" @onclick="Ara">Ara</button>
     </div>
 
@@ -75,7 +80,7 @@
     private int? seciliKategori;
     private List<ProductDto> liste = new List<ProductDto>();
     private List<CategoryDto> categoryListe = new();
-
+    private string _errorMessage = string.Empty;
     protected override async Task OnInitializedAsync()
     {
         var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>("api/Recipe/getShortRecipes");
@@ -83,7 +88,7 @@
 
         var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
         categoryListe = response2?.Data ?? new List<CategoryDto>();
-        
+
     }
 
     private void EnterAra(KeyboardEventArgs e)
@@ -93,8 +98,15 @@
 
     private void Ara()
     {
-        var url = $"recipe/search?query={Uri.EscapeDataString(arama ?? "")}&category={seciliKategori}";
-        Nav.NavigateTo(url);
+        if (string.IsNullOrWhiteSpace(arama))
+        {
+            _errorMessage = "Arama yapabilemek için bir şeyler yazmalısınız.";
+        }
+        else
+        {
+            var url = $"recipe/search?query={Uri.EscapeDataString(arama ?? "")}&category={seciliKategori}";
+            Nav.NavigateTo(url);
+        }
     }
 
     private void KategoriGit(int k)

@@ -20,6 +20,8 @@ public partial class RecipeBookProjectDbContext : DbContext
 
     public virtual DbSet<Product> Products { get; set; }
 
+    public virtual DbSet<ProductVote> ProductVotes { get; set; }
+
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public virtual DbSet<SavedProduct> SavedProducts { get; set; }
@@ -30,8 +32,6 @@ public partial class RecipeBookProjectDbContext : DbContext
     {
         modelBuilder.Entity<Comment>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedNever();
-
             entity.HasOne(d => d.Product).WithMany(p => p.Comments)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Comments_Products");
@@ -48,6 +48,17 @@ public partial class RecipeBookProjectDbContext : DbContext
                 .HasConstraintName("FK_Products_Categories");
 
             entity.HasOne(d => d.FeaturedCategory).WithMany(p => p.Products).HasConstraintName("FK_Products_FeaturedCategory");
+        });
+
+        modelBuilder.Entity<ProductVote>(entity =>
+        {
+            entity.HasOne(d => d.Product).WithMany(p => p.ProductVotes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductVotes_Products");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ProductVotes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductVotes_Users");
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

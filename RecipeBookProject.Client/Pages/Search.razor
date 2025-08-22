@@ -9,6 +9,12 @@
 
     @if (categoryListe is not null)
     {
+        @if (liste is null || liste.Count == 0)
+        {
+            <div class="alert alert-danger">Arama sonucunda hiçbir şey bulunamadı.</div>   
+        }
+        else
+        {
         @for (int i = 0; i < categoryListe.Count; i++)
         {
             var cat = categoryListe[i];
@@ -17,8 +23,10 @@
 
             <ProductSlider Title="@cat.CategoryName" Items="@items" />
             <div style="margin-top:50px;"></div>
+                }
+            }
         }
-    }
+    
 </div>
 
 @code {

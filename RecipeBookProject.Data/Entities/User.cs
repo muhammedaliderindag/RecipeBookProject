@@ -28,7 +28,6 @@ public partial class User
     [StringLength(50)]
     public string? Role { get; set; }
 
-    [StringLength(50)]
     public string? ProfileImageUrl { get; set; }
 
     [StringLength(50)]
@@ -39,6 +38,9 @@ public partial class User
 
     [InverseProperty("User")]
     public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<ProductVote> ProductVotes { get; set; } = new List<ProductVote>();
 
     [InverseProperty("User")]
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

@@ -7,6 +7,7 @@ using RecipeBookProject.Data.Entities;
 using RecipeBookProject.DataAccess.Repositories.Abstract;
 using System;
 using System.Globalization;
+using System.Runtime.Intrinsics.X86;
 using System.Security.Claims;
 using static RecipeBookProject.Business.Middleware.ExceptionHandlerMiddleware;
 public class RecipeService : IRecipeService
@@ -117,12 +118,10 @@ public class RecipeService : IRecipeService
     public async Task<GeneralResponse<List<ProductDto>>> GetSearchedProductsAsync(string query, int? category)
     {
 
-        if(query is null)
-        {
-            query = "";
-        }
+        var response = string.IsNullOrWhiteSpace(query)
+            ? await _recipeRepository.GetSearchedProductsRepositoryAsync(category)
+            : await _recipeRepository.GetSearchedProductsRepository(query, category);
 
-        var response = await _recipeRepository.GetSearchedProductsRepository(query, category);
         if (response == null)
         {
             throw new Exception("Veriler çekilemedi");
@@ -182,10 +181,49 @@ public class RecipeService : IRecipeService
         return GeneralResponse<List<ProductDto>>.Success(recipesDto, "Veriler başarıyla çekildi");
     }
 
-    static string FirstInitial(string? s)
+    static string FirstInitial(string? s) // İlk haftayı büyük yapmak için Türkçe kültürünü kullanıyoruz
     {
         if (string.IsNullOrWhiteSpace(s)) return "";
-        // İlk harfi al ve TR kültürüne göre büyüt (İ/i doğru olsun)
         return s.Trim().Substring(0, 1).ToUpper(new CultureInfo("tr-TR"));
+    }
+
+    public async Task<GeneralResponse<NoData>> SaveRecipeAsync(int userId, int productId, bool isSaved, CancellationToken ct)
+    {
+        var repositoryResponse = await _recipeRepository.SaveRecipeRepositoryAsync(userId, productId, isSaved);
+        if (!repositoryResponse)
+        {
+            throw new Exception("Veriler kaydedilemedi");
+        }
+        return GeneralResponse<NoData>.Success("Veriler başarıyla kaydedildi", 200);
+    }
+
+    public async Task<GeneralResponse<bool>> GetSavedRecipeAsync(int userId, int productId, CancellationToken ct)
+    {
+        var repositoryResponse = await _recipeRepository.GetSavedRecipeRepositoryAsync(userId, productId);
+        return GeneralResponse<bool>.Success(repositoryResponse, "Başarıyla saved çekildi.",200);
+    }
+
+    public async Task<GeneralResponse<NoData>> VoteRecipeAsync(int userId, int productId, int vote, CancellationToken ct)
+    {
+        var repositoryResponse = await _recipeRepository.VoteRecipeRepositoryAsync(userId, productId, vote);
+        if (!repositoryResponse)
+        {
+            throw new Exception("Veriler kaydedilemedi");
+        }
+        return GeneralResponse<NoData>.Success("Veriler başarıyla kaydedildi", 200);
+    }
+
+    public async Task<GeneralResponse<VoteRecipeDto>> GetVotedRecipeAsync(int userId, int productId, CancellationToken ct)
+    {
+        var (totalVoters, avg, userVote) = await _recipeRepository.GetVotedRecipeRepositoryAsync(userId, productId);
+
+        var dtoMapping = new VoteRecipeDto
+        {
+            productid = productId,
+            vote = userVote ?? 0,                  // kullanıcı hiç oy vermemişse 0
+            avgVote = avg,        // double → int (yuvarlanmış)
+            totalVoters = totalVoters
+        };
+        return GeneralResponse<VoteRecipeDto>.Success(dtoMapping, "Başarıyla saved çekildi.", 200);
     }
 }

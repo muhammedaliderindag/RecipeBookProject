@@ -49,27 +49,65 @@ namespace RecipeBookProject.WebApi.Controllers.Recipe
 
         [HttpGet("{id:int}/comments")]
         public async Task<ActionResult<GeneralResponse<PagedResult<CommentDto>>>> GetComments(
-    int id,
-    [FromQuery] int page = 1,
-    [FromQuery] int pageSize = 10,
-    [FromQuery] string sort = "new",
-    CancellationToken ct = default)
+            int id,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string sort = "new",
+            CancellationToken ct = default)
         {
-            //int? currentUserId = null;
-            //if (User?.Identity?.IsAuthenticated == true)
-            //{
-            //    var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            //    if (int.TryParse(idStr, out var parsed)) currentUserId = parsed;
-            //}
-            //if (currentUserId == null)
-            //{
-            //    return Unauthorized(GeneralResponse<PagedResult<CommentDto>>.Fail("Kullanıcı kimliği bulunamadı.", 401));
-            //}
+            if (User?.Identity?.IsAuthenticated != true)
+                return Unauthorized(GeneralResponse<PagedResult<CommentDto>>.Fail("Oturum doğrulanamadı.", 401));
 
-            int usersId = 2;
+            var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(idStr, out var userId))
+                return Unauthorized(GeneralResponse<PagedResult<CommentDto>>.Fail("Kullanıcı kimliği bulunamadı.", 401));
 
-            var response = await _recipeService.GetProductCommentsAsync(id, usersId, page,pageSize,sort, ct);
+            var response = await _recipeService.GetProductCommentsAsync(id, userId, page, pageSize, sort, ct);
+
             return Ok(response);
         }
+
+        [HttpPost("save-recipe")]
+        public async Task<ActionResult<GeneralResponse<NoData>>> SaveRecipe([FromBody] SaveRecipeRequestDto request,CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<NoData>.Fail("Kullanıcı doğrulanamadı.", 401));
+
+            var result = await _recipeService.SaveRecipeAsync(userId, request.ProductId, request.IsSaved, ct);
+            return Ok(result);
+        }
+        [HttpGet("getsavedrecipe")]
+        public async Task<ActionResult<GeneralResponse<bool>>> GetSaveRecipe([FromQuery] int recipeId, CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<bool>.Fail("Kullanıcı doğrulanamadı.", 401));
+
+            var result = await _recipeService.GetSavedRecipeAsync(userId,recipeId, ct);
+            return Ok(result);
+        }
+        [HttpPost("vote-recipe")]
+        public async Task<ActionResult<GeneralResponse<NoData>>> VoteRecipe([FromBody] VoteRecipeDto request, CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<NoData>.Fail("Kullanıcı doğrulanamadı.", 401));
+
+            var result = await _recipeService.VoteRecipeAsync(userId, request.productid, request.vote, ct);
+            return Ok(result);
+        }
+
+        [HttpGet("getvotedrecipe")]
+        public async Task<ActionResult<GeneralResponse<VoteRecipeDto>>> GetVotedRecipe([FromQuery] int recipeId, CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<VoteRecipeDto>.Fail("Kullanıcı doğrulanamadı.", 401));
+
+            var result = await _recipeService.GetVotedRecipeAsync(userId, recipeId, ct);
+            return Ok(result);
+        }
+
     }
 }

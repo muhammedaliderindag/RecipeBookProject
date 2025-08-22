@@ -42,5 +42,8 @@ public partial class Product
     public virtual FeaturedCategory? FeaturedCategory { get; set; }
 
     [InverseProperty("Product")]
+    public virtual ICollection<ProductVote> ProductVotes { get; set; } = new List<ProductVote>();
+
+    [InverseProperty("Product")]
     public virtual ICollection<SavedProduct> SavedProducts { get; set; } = new List<SavedProduct>();
 }
