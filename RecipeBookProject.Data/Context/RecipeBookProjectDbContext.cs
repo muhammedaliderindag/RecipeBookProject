@@ -12,6 +12,8 @@ public partial class RecipeBookProjectDbContext : DbContext
     {
     }
 
+    public virtual DbSet<AbuseCategory> AbuseCategories { get; set; }
+
     public virtual DbSet<Category> Categories { get; set; }
 
     public virtual DbSet<Comment> Comments { get; set; }
@@ -19,6 +21,8 @@ public partial class RecipeBookProjectDbContext : DbContext
     public virtual DbSet<FeaturedCategory> FeaturedCategories { get; set; }
 
     public virtual DbSet<Product> Products { get; set; }
+
+    public virtual DbSet<ProductAbuse> ProductAbuses { get; set; }
 
     public virtual DbSet<ProductVote> ProductVotes { get; set; }
 
@@ -48,6 +52,21 @@ public partial class RecipeBookProjectDbContext : DbContext
                 .HasConstraintName("FK_Products_Categories");
 
             entity.HasOne(d => d.FeaturedCategory).WithMany(p => p.Products).HasConstraintName("FK_Products_FeaturedCategory");
+        });
+
+        modelBuilder.Entity<ProductAbuse>(entity =>
+        {
+            entity.HasOne(d => d.Category).WithMany(p => p.ProductAbuses)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductAbuse_AbuseCategory1");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.ProductAbuses)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductAbuse_Products1");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ProductAbuses)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductAbuse_Users");
         });
 
         modelBuilder.Entity<ProductVote>(entity =>

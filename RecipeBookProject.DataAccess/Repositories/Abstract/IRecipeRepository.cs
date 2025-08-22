@@ -1,4 +1,5 @@
-﻿using RecipeBookProject.Data.Entities;
+﻿using Azure.Core;
+using RecipeBookProject.Data.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,5 +21,8 @@ namespace RecipeBookProject.DataAccess.Repositories.Abstract
        Task<bool> GetSavedRecipeRepositoryAsync(int userId, int productId);
        Task<(int totalVoters, double avg, int? userVote)> GetVotedRecipeRepositoryAsync(int userId, int productId);
        Task<IQueryable<Comment>> GetProductCommentsRepositoryAsync(int id);
+       Task<bool> AddCommentsRepositoryAsync(int productid, int userid, bool isSecret,string comment);
+       Task<bool> SaveAbuseRepositoryAsync(int userid, int ProductId, int AbuseCategoryId, string Description);
+       Task<List<AbuseCategory>> GetAbuseCategoryRepositoryAsync();
     }
 }

@@ -229,24 +229,30 @@ else if (product is not null)
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Gerekçe</label>
-                            <InputRadioGroup @bind-Value="report.Reason">
-                                <div class="form-check">
-                                    <InputRadio class="form-check-input" Value=@("Yanıltıcı içerik") />
-                                    <label class="form-check-label">Yanıltıcı içerik</label>
-                                </div>
-                                <div class="form-check">
-                                    <InputRadio class="form-check-input" Value=@("Uygunsuz / rahatsız edici") />
-                                    <label class="form-check-label">Uygunsuz / rahatsız edici</label>
-                                </div>
-                                <div class="form-check">
-                                    <InputRadio class="form-check-input" Value=@("Telif / ihlal") />
-                                    <label class="form-check-label">Telif / hak ihlali</label>
-                                </div>
-                                <div class="form-check">
-                                    <InputRadio class="form-check-input" Value=@("Spam / Reklam") />
-                                    <label class="form-check-label">Spam / reklam</label>
-                                </div>
-                            </InputRadioGroup>
+
+                                <InputRadioGroup @bind-Value="report.Reason">
+                                @foreach (var item in abuseCategories)
+                                {
+                                    <div class="form-check">
+                                        <InputRadio class="form-check-input" Value=@item.CategoryId />
+                                        <label class="form-check-label">@item.CategoryName</label>
+                                    </div>
+                                }
+@*                                     <div class="form-check">
+                                        <InputRadio class="form-check-input" Value=@("Uygunsuz / rahatsız edici") />
+                                        <label class="form-check-label">Uygunsuz / rahatsız edici</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <InputRadio class="form-check-input" Value=@("Telif / ihlal") />
+                                        <label class="form-check-label">Telif / hak ihlali</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <InputRadio class="form-check-input" Value=@("Spam / Reklam") />
+                                        <label class="form-check-label">Spam / reklam</label> *@
+                                    @* </div> *@
+                                </InputRadioGroup>
+                       
+
                         </div>
 
                         <div class="mb-3">
@@ -303,6 +309,7 @@ else if (product is not null)
 
     // Şikayet
     private ReportVm report = new();
+    private List<AbuseCategoryDto> abuseCategories = new();
     ClaimsPrincipal? usera;
     protected override async Task OnParametersSetAsync()
     {
@@ -324,6 +331,7 @@ else if (product is not null)
                 await LoadCommentsAsync(1);
                 await LoadSavedRecipe();
                 await LoadVotedRecipe();
+                await LoadAbuseCategory();
                 usera = (await Auth.GetAuthenticationStateAsync()).User;
             }
         }
@@ -353,6 +361,22 @@ else if (product is not null)
             _saved = false;
         }
     }
+
+    private async Task LoadAbuseCategory()
+    {
+        StateHasChanged();
+        var res = await Http.GetFromJsonAsync<ApiResponse<List<AbuseCategoryDto>>>(
+        $"api/Recipe/getabusecategory");
+        if (res?.IsSuccess == true)
+        {
+            abuseCategories = res.Data ?? new();
+        }
+        else
+        {
+            _infoMessage = "Şikayet kategorileri yüklenemedi.";
+        }
+    }
+
     private async Task LoadVotedRecipe()
     {
         StateHasChanged();
@@ -496,8 +520,7 @@ else if (product is not null)
 
     private async Task AddComment()
     {
-        // TODO: gerçek API'ye POST yap
-        // await Http.PostAsJsonAsync($"api/recipes/{id}/comments", new { newComment.Name, newComment.Text });
+        await Http.PostAsJsonAsync($"api/recipe/{id}/comments", new { isSecret=newComment.Secret, commentText=newComment.Text });
 
         newComment = new();
         _infoMessage = "Yorumunuz eklendi.";
@@ -506,17 +529,49 @@ else if (product is not null)
     }
     public record ProductDto(int Id, string ProductName, string ImageUrl, string ProductDetailedText,
     double RatingAvg, int RatingCount, int? YourRating, bool IsSavedByYou, int CommentsCount);
-    private void SubmitReport()
+    private async Task SubmitReport()
     {
-        if (string.IsNullOrWhiteSpace(report.Reason))
+        if (report.Reason is null)
         {
             _infoMessage = "Lütfen bir şikayet gerekçesi seçin.";
             return;
         }
 
-        _infoMessage = "Şikayetiniz alındı. Teşekkürler.";
-        report = new();
-        // TODO: POST api/recipe/report
+        int abuseId = report.Reason is int i ? i
+                     : int.TryParse(report.Reason?.ToString(), out var tmp) ? tmp
+                     : -1;
+        if (abuseId < 0)
+        {
+            _infoMessage = "Geçersiz gerekçe.";
+            return;
+        }
+
+        var payload = new AbuseRequestDto
+        {
+            ProductId = id,
+            AbuseCategoryId = abuseId,
+            Description = report.Details ?? ""
+        };
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/recipe/saveabuse", payload);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _infoMessage = "Şikayetiniz alındı. Teşekkürler.";
+                report = new(); 
+            }
+            else
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                _infoMessage = $"Hata: {(int)resp.StatusCode} - {body}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _infoMessage = $"İstek gönderilemedi: {ex.Message}";
+        }
     }
 
     class CommentVm
@@ -539,7 +594,7 @@ else if (product is not null)
     class ReportVm
     {
         [Required]
-        public string Reason { get; set; } = "";
+        public int? Reason { get; set; }
         public string? Details { get; set; }
     }
 }

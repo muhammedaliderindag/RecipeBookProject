@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <None Include="Abstract\IRecipeService.cs" />
+    <None Include="Models\AbuseCategoryDto.cs" />
   </ItemGroup>
 
   <ItemGroup>

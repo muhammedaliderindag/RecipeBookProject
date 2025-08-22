@@ -231,5 +231,51 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
 
             return (totalVoters, avg, userVote);
         }
+
+        public async Task<bool> AddCommentsRepositoryAsync(int productid, int userid, bool isSecret, string comment)
+        {
+            var entity = new Comment
+            {
+                ProductId = productid,
+                UserId = userid,
+                Secret = isSecret,
+                Text = comment,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _context.Comments.AddAsync(entity);
+            var affected = await _context.SaveChangesAsync(); 
+
+            return affected > 0;
+        }
+
+        public async Task<List<AbuseCategory>> GetAbuseCategoryRepositoryAsync()
+        {
+            var list = await _context.AbuseCategories
+                .Select(ac => new AbuseCategory
+                {
+                    CategoryId = ac.CategoryId,
+                    CategoryName = ac.CategoryName
+                })
+                .ToListAsync();
+            return list;
+        }
+
+        public async Task<bool> SaveAbuseRepositoryAsync(int userid, int ProductId, int AbuseCategoryId, string Description)
+        {
+            var entity = new ProductAbuse
+            {
+                ProductId = ProductId,
+                UserId = userid,
+                CategoryId = AbuseCategoryId,
+                Text = Description,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _context.ProductAbuses.AddAsync(entity);
+            var affected = await _context.SaveChangesAsync();
+
+            return affected > 0;
+        }
     }
 }

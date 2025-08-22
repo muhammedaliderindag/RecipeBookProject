@@ -226,4 +226,45 @@ public class RecipeService : IRecipeService
         };
         return GeneralResponse<VoteRecipeDto>.Success(dtoMapping, "Başarıyla saved çekildi.", 200);
     }
+
+    public async Task<GeneralResponse<NoData>> AddCommentsAsync(int productid, int id, AddCommentDto dto, CancellationToken ct)
+    {
+        var response = await _recipeRepository.AddCommentsRepositoryAsync(productid, id, dto.isSecret,dto.commentText);
+
+        if (!response)
+        {
+            throw new Exception("Db kayıt başarısız oldu");
+        }
+        return GeneralResponse<NoData>.Success("Başarılı", 201);
+    }
+
+    public async Task<GeneralResponse<List<AbuseCategoryDto>>> GetAbuseCategory()
+    {
+        var response = await _recipeRepository.GetAbuseCategoryRepositoryAsync();
+        if (response == null || !response.Any())
+        {
+            throw new Exception("Veriler çekilemedi");
+        }
+
+        var dtoMapping = response.Select(ac => new AbuseCategoryDto
+        {
+            CategoryId = ac.CategoryId,
+            CategoryName = ac.CategoryName
+        }).ToList();
+        return GeneralResponse<List<AbuseCategoryDto>>.Success(dtoMapping, "Veriler başarıyla çekildi", 200);
+    }
+
+    public async Task<GeneralResponse<NoData>> SaveAbuseAsync(int userid, AbuseRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            request.Description = string.Empty;
+        }
+        var response = await _recipeRepository.SaveAbuseRepositoryAsync(userid, request.ProductId, request.AbuseCategoryId, request.Description);
+        if (!response)
+        {
+            throw new Exception("Kaydetme başarısız oldu.");
+        }
+        return GeneralResponse<NoData>.Success("Başarıyla kaydedildi", 201);
+    }
 }

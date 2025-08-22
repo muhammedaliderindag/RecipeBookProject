@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RecipeBookProject.Business.Abstract;
 using RecipeBookProject.Business.Models;
+using RecipeBookProject.Data.Entities;
 using System.Security.Claims;
 
 namespace RecipeBookProject.WebApi.Controllers.Recipe
@@ -67,6 +68,22 @@ namespace RecipeBookProject.WebApi.Controllers.Recipe
             return Ok(response);
         }
 
+
+        [HttpPost("{id:int}/comments")]
+        public async Task<ActionResult<GeneralResponse<PagedResult<CommentDto>>>> PostComments(int id,[FromBody] AddCommentDto dto,CancellationToken ct = default)
+        {
+            if (User?.Identity?.IsAuthenticated != true)
+                return Unauthorized(GeneralResponse<PagedResult<CommentDto>>.Fail("Oturum doğrulanamadı.", 401));
+
+            var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(idStr, out var userId))
+                return Unauthorized(GeneralResponse<PagedResult<CommentDto>>.Fail("Kullanıcı kimliği bulunamadı.", 401));
+
+            var response = await _recipeService.AddCommentsAsync(id, userId, dto, ct);
+
+            return Ok(response);
+        }
+
         [HttpPost("save-recipe")]
         public async Task<ActionResult<GeneralResponse<NoData>>> SaveRecipe([FromBody] SaveRecipeRequestDto request,CancellationToken ct)
         {
@@ -109,5 +126,21 @@ namespace RecipeBookProject.WebApi.Controllers.Recipe
             return Ok(result);
         }
 
+        [HttpGet("getabusecategory")]
+        public async Task<ActionResult<GeneralResponse<VoteRecipeDto>>> GetAbuseCategory(CancellationToken ct)
+        {
+            var result = await _recipeService.GetAbuseCategory();
+            return Ok(result);
+        }
+
+        [HttpPost("saveabuse")]
+        public async Task<ActionResult<GeneralResponse<NoData>>> SaveAbuse([FromBody] AbuseRequestDto request, CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<NoData>.Fail("Kullanıcı doğrulanamadı.", 401));
+            var result = await _recipeService.SaveAbuseAsync(userId, request);
+            return Ok(result);
+        }
     }
 }

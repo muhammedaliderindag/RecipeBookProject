@@ -40,6 +40,9 @@ public partial class User
     public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
 
     [InverseProperty("User")]
+    public virtual ICollection<ProductAbuse> ProductAbuses { get; set; } = new List<ProductAbuse>();
+
+    [InverseProperty("User")]
     public virtual ICollection<ProductVote> ProductVotes { get; set; } = new List<ProductVote>();
 
     [InverseProperty("User")]
