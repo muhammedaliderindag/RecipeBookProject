@@ -22,7 +22,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // 4. Token yenileme mantýðýný yönetecek olan HttpMessageHandler'ý ekle
 builder.Services.AddScoped<AuthHeaderHandler>();
-
+builder.Services.AddScoped<AdminProductsService>();
 // 5. HttpClient'ý API adresini ve AuthHeaderHandler'ý kullanacak þekilde yapýlandýr
 builder.Services.AddHttpClient("Api", client =>
 {

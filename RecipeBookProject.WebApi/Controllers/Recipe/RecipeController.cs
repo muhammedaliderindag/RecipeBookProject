@@ -142,5 +142,14 @@ namespace RecipeBookProject.WebApi.Controllers.Recipe
             var result = await _recipeService.SaveAbuseAsync(userId, request);
             return Ok(result);
         }
+        [HttpPost("createrecipe")]
+        public async Task<ActionResult<GeneralResponse<NoData>>> CreateRecipe([FromBody] CreateProductDto request, CancellationToken ct)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId))
+                return Unauthorized(GeneralResponse<NoData>.Fail("Kullanıcı doğrulanamadı.", 401));
+            var result = await _recipeService.CreateRecipeAsync(userId, request);
+            return Ok(result);
+        }
     }
 }

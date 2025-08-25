@@ -48,8 +48,8 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
                     ProductDetailedText = p.ProductDetailedText,
                     CategoryId = p.CategoryId,
                     ImageUrl = p.ImageUrl,
-                    ProductionTime = p.ProductionTime,
-                    FeaturedCategory = new FeaturedCategory
+                    ProductionTime = p.ProductionTime,  
+                    FeaturedCategory = p.FeaturedCategory == null ? null : new FeaturedCategory
                     {
                         FeaturedCategoryId = p.FeaturedCategory.FeaturedCategoryId,
                         FeaturedCategoryName = p.FeaturedCategory.FeaturedCategoryName
@@ -93,7 +93,7 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
                         ((EF.Functions.Like(p.ProductName, "%" + query + "%") ||
                          EF.Functions.Like(p.ProductDetailedText, "%" + query + "%")))
                         && (categoryid == null || p.CategoryId == categoryid)
-)
+                )
                 .Select(p => new Product
                 {
                     ProductId = p.ProductId,
@@ -103,7 +103,7 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
                     CategoryId = p.CategoryId,
                     ImageUrl = p.ImageUrl,
                     ProductionTime = p.ProductionTime,
-                    FeaturedCategory = new FeaturedCategory
+                    FeaturedCategory = p.FeaturedCategory == null ? null : new FeaturedCategory
                     {
                         FeaturedCategoryId = p.FeaturedCategory.FeaturedCategoryId,
                         FeaturedCategoryName = p.FeaturedCategory.FeaturedCategoryName
@@ -155,29 +155,29 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
         public Task<List<Product>> GetSearchedProductsRepositoryAsync(int? categoryid)
         {
             return _context.Products
-    .Include(p => p.Category)
-    .Include(p => p.FeaturedCategory)
-    .Where(p =>(categoryid == null || p.CategoryId == categoryid))
-    .Select(p => new Product
-    {
-        ProductId = p.ProductId,
-        ProductName = p.ProductName,
-        ProductShortDesc = p.ProductShortDesc,
-        ProductDetailedText = p.ProductDetailedText,
-        CategoryId = p.CategoryId,
-        ImageUrl = p.ImageUrl,
-        ProductionTime = p.ProductionTime,
-        FeaturedCategory = new FeaturedCategory
-        {
-            FeaturedCategoryId = p.FeaturedCategory.FeaturedCategoryId,
-            FeaturedCategoryName = p.FeaturedCategory.FeaturedCategoryName
-        },
-        Category = new Category
-        {
-            CategoryId = p.Category.CategoryId,
-            CategoryName = p.Category.CategoryName
-        }
-    }).ToListAsync();
+                .Include(p => p.Category)
+                .Include(p => p.FeaturedCategory)
+                .Where(p => (categoryid == null || p.CategoryId == categoryid))
+                .Select(p => new Product
+                {
+                    ProductId = p.ProductId,
+                    ProductName = p.ProductName,
+                    ProductShortDesc = p.ProductShortDesc,
+                    ProductDetailedText = p.ProductDetailedText,
+                    CategoryId = p.CategoryId,
+                    ImageUrl = p.ImageUrl,
+                    ProductionTime = p.ProductionTime,
+                    FeaturedCategory = p.FeaturedCategory == null ? null : new FeaturedCategory
+                    {
+                        FeaturedCategoryId = p.FeaturedCategory.FeaturedCategoryId,
+                        FeaturedCategoryName = p.FeaturedCategory.FeaturedCategoryName
+                    },
+                    Category = new Category
+                    {
+                        CategoryId = p.Category.CategoryId,
+                        CategoryName = p.Category.CategoryName
+                    }
+                }).ToListAsync();
         }
 
         public async Task<bool> VoteRecipeRepositoryAsync(int userId, int productId, int vote)
@@ -273,6 +273,14 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
             };
 
             await _context.ProductAbuses.AddAsync(entity);
+            var affected = await _context.SaveChangesAsync();
+
+            return affected > 0;
+        }
+
+        public async Task<bool> CreateRecipeRepositoryAsync(int userId, PendingProduct product)
+        {
+            await _context.PendingProducts.AddAsync(product);
             var affected = await _context.SaveChangesAsync();
 
             return affected > 0;

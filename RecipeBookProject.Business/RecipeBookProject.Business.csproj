@@ -17,7 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RecipeBookProject.Contracts\RecipeBookProject.Contracts.csproj" />
     <ProjectReference Include="..\RecipeBookProject.DataAccess\RecipeBookProject.DataAccess.csproj" />
+    <ProjectReference Include="..\RecipeBookProject.Data\RecipeBookProject.Data.csproj" />
   </ItemGroup>
 
 </Project>

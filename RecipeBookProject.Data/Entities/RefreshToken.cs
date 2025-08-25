@@ -21,7 +21,6 @@ public partial class RefreshToken
     public DateTime Created { get; set; }
 
     public DateTime? Revoked { get; set; }
-
     public bool IsExpired => DateTime.UtcNow >= Expires;
     public bool IsActive => Revoked == null && !IsExpired;
 

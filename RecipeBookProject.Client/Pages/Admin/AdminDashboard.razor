@@ -1,5 +1,8 @@
 ﻿@page "/admin"
 @using System.Globalization
+@using RecipeBookProject.Contracts.Common
+@using RecipeBookProject.Contracts.Admin
+@inject RecipeBookProject.Client.Services.AdminProductsService AdminSvc
 
 <!-- Erişilebilirlik -->
 <h1 class="visually-hidden">Yönetim Paneli</h1>
@@ -19,16 +22,16 @@
             <i class="bi bi-funnel me-1"></i>Filtreler
         </button>
 
-        <a class="btn btn-outline-primary" href="#">
+@*         <a class="btn btn-outline-primary" href="#">
             <i class="bi bi-clipboard-check me-1"></i>Onay Kuyruğu
         </a>
 
         <a class="btn btn-primary" href="#">
             <i class="bi bi-plus-lg me-1"></i>Yeni Tarif
-        </a>
+        </a> *@
     </div>
 
-    <!-- KPI Kartları -->
+    <!-- KPI Kartları (statik örnekler) -->
     <div class="row g-3 mb-3">
         @foreach (var kpi in Kpis)
         {
@@ -53,7 +56,7 @@
         }
     </div>
 
-    <!-- Grafik Bölümü (statik placeholder) -->
+    <!-- Grafik Bölümü (placeholder) -->
     <div class="row g-3 mb-3">
         <div class="col-12 col-xl-8">
             <div class="card shadow-sm h-100">
@@ -66,7 +69,6 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Basit SVG area chart placeholder -->
                     <div class="chart-area">
                         <svg viewBox="0 0 100 36" preserveAspectRatio="none" class="w-100 h-100">
                             <defs>
@@ -75,17 +77,14 @@
                                     <stop offset="100%" stop-color="var(--brand)" stop-opacity="0" />
                                 </linearGradient>
                             </defs>
-                            <!-- grid -->
                             <g stroke="currentColor" opacity=".1">
                                 <line x1="0" y1="35" x2="100" y2="35" />
                                 <line x1="0" y1="26" x2="100" y2="26" />
                                 <line x1="0" y1="17" x2="100" y2="17" />
                                 <line x1="0" y1="8" x2="100" y2="8" />
                             </g>
-                            <!-- area -->
                             <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9 L100,35 L0,35 Z"
                                   fill="url(#grad)" />
-                            <!-- line -->
                             <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9"
                                   fill="none" stroke="var(--brand)" stroke-width="1.5" />
                         </svg>
@@ -99,7 +98,7 @@
             </div>
         </div>
 
-        <!-- Donut (CSS conic-gradient placeholder) -->
+        <!-- Donut (placeholder) -->
         <div class="col-12 col-xl-4">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-transparent">
@@ -138,8 +137,17 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
                     <span class="fw-medium">Onay Bekleyen Tarifler</span>
-                    <a href="#" class="small">Tümünü gör <i class="bi bi-arrow-right-short"></i></a>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <input class="form-control form-control-sm" style="width:220px" placeholder="Ara (isim/açıklama)"
+                               @bind="Search" @bind:event="oninput" @onkeydown="OnSearchKeydown" />
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSearch">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+@*                         <a href="#" class="small d-none d-sm-inline">Tümünü gör <i class="bi bi-arrow-right-short"></i></a>
+ *@                    </div>
                 </div>
+
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
                         <thead class="table-light">
@@ -147,57 +155,103 @@
                                 <th>Tarif</th>
                                 <th>Yazar</th>
                                 <th>Tarih</th>
-                                <th class="text-center">Puan</th>
-                                <th class="text-center">Şikayet</th>
+                                <th>Kategori</th>
+                                <th class="text-center">Süre</th>
+                                <th class="text-center">Durum</th>
                                 <th class="text-end">İşlem</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var r in Pending)
+                            @if (IsLoading)
                             {
                                 <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <img src="@r.ThumbUrl" class="rounded me-2" style="width:36px;height:36px;object-fit:cover;" alt="">
-                                            <div>
-                                                <div class="fw-medium">@r.Title</div>
-                                                <div class="text-body-secondary small">@r.Category</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>@r.Author</td>
-                                    <td>@r.DateAdded.ToString("dd.MM.yyyy")</td>
-                                    <td class="text-center">@r.Rating.ToString("0.0")</td>
-                                    <td class="text-center">
-                                        @if (r.ReportCount > 0)
-                                        {
-                                            <span class="badge text-bg-danger-subtle border border-danger-subtle">@r.ReportCount</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-body-secondary">—</span>
-                                        }
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="btn-group btn-group-sm">
-                                            <a class="btn btn-outline-success" href="#"><i class="bi bi-check2"></i></a>
-                                            <a class="btn btn-outline-warning" href="#"><i class="bi bi-pencil"></i></a>
-                                            <a class="btn btn-outline-danger" href="#"><i class="bi bi-x"></i></a>
-                                        </div>
+                                    <td colspan="7" class="text-center py-5">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                        Yükleniyor...
                                     </td>
                                 </tr>
+                            }
+                            else if (Data.TotalCount == 0)
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-body-secondary">
+                                        Kayıt bulunamadı.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var r in Data.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="@r.ImageUrl" class="rounded me-2" style="width:36px;height:36px;object-fit:cover;" alt="">
+                                                <div>
+                                                    <div class="fw-medium">@r.ProductName</div>
+                                                    <div class="text-body-secondary small">@r.ProductShortDesc</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>@r.Author</td>
+                                        <td>@r.CreatedAt.ToString("dd.MM.yyyy")</td>
+                                        <td>@r.CategoryName</td>
+                                        <td class="text-center">@r.ProductionTime dk</td>
+                                        <td class="text-center">
+                                            @if (r.IsApproved)
+                                            {
+                                                <span class="badge text-bg-success-subtle border border-success-subtle text-black">Onaylı</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-warning-subtle border border-warning-subtle text-black">Bekliyor</span>
+                                            }
+                                        </td>
+
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                @if (!r.IsApproved)
+                                                {
+                                                    <button class="btn btn-outline-success" disabled="@IsBusy" title="Onayla" @onclick="() => Approve(r.ProductId)">
+                                                        <i class="bi bi-check2"></i>
+                                                    </button>
+                                                    }
+                                                    @*                                                 <button class="btn btn-outline-warning" disabled="@IsBusy" title="Düzenle" @onclick="() => Edit(r.ProductId)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button> *@
+                                                    <button class="btn btn-outline-danger" disabled="@IsBusy" title="Reddet" @onclick="() => Reject(r.ProductId)">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer bg-transparent d-flex justify-content-end">
+
+                <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                    <div class="small text-body-secondary">
+                        @((Data.TotalCount == 0)
+                                                ? "Kayıt yok"
+                                                : $"{((Page - 1) * PageSize) + 1}–{Math.Min(Page * PageSize, Data.TotalCount)} / {Data.TotalCount}" )
+                    </div>
                     <nav aria-label="Sayfalama">
                         <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item disabled"><span class="page-link">Önceki</span></li>
-                            <li class="page-item active"><span class="page-link">1</span></li>
-                            <li class="page-item"><a class="page-link" href="#">2</a></li>
-                            <li class="page-item"><a class="page-link" href="#">3</a></li>
-                            <li class="page-item"><a class="page-link" href="#">Sonraki</a></li>
+                            <li class="page-item @(Page == 1 ? "disabled" : "")">
+                                <button class="page-link" @onclick="Prev">Önceki</button>
+                            </li>
+                            @for (int p = 1; p <= TotalPages; p++)
+                            {
+                                <li class="page-item @(p == Page ? "active" : "")">
+                                    <button class="page-link" @onclick="() => Go(p)">@p</button>
+                                </li>
+                            }
+                            <li class="page-item @((Page >= TotalPages) ? "disabled" : "")">
+                                <button class="page-link" @onclick="Next">Sonraki</button>
+                            </li>
                         </ul>
                     </nav>
                 </div>
@@ -255,54 +309,32 @@
     <div class="offcanvas-body">
         <div class="mb-3">
             <label class="form-label">Durum</label>
-            <select class="form-select">
-                <option>Tümü</option>
-                <option>Onay Bekleyen</option>
-                <option>Yayında</option>
-                <option>Taslak</option>
-                <option>Şikayetli</option>
+            <select class="form-select" @bind="Status">
+                <option value="all">Tümü</option>
+                <option value="pending">Onay Bekleyen</option>
+                <option value="approved">Yayında</option>
             </select>
         </div>
         <div class="mb-3">
             <label class="form-label">Kategori</label>
-            <select class="form-select">
-                <option>Tümü</option>
-                <option>Ana Yemekler</option>
-                <option>Tatlılar</option>
-                <option>Çorbalar</option>
-                <option>Vejetaryen</option>
-            </select>
-        </div>
-        <div class="row g-2 mb-3">
-            <div class="col">
-                <label class="form-label">Başlangıç</label>
-                <input type="date" class="form-control" />
-            </div>
-            <div class="col">
-                <label class="form-label">Bitiş</label>
-                <input type="date" class="form-control" />
-            </div>
+            <input class="form-control" type="number" min="0" placeholder="Kategori Id (opsiyonel)" @bind="CategoryIdString" />
+            <div class="form-text">Boş bırakılırsa tüm kategoriler.</div>
         </div>
         <div class="mb-3">
-            <label class="form-label">Şikayet Türü</label>
-            <select class="form-select">
-                <option>Hepsi</option>
-                <option>Uygunsuz Dil</option>
-                <option>Yanıltıcı</option>
-                <option>Telif</option>
-                <option>Spam</option>
-            </select>
+            <label class="form-label">Arama</label>
+            <input class="form-control" placeholder="İsim veya kısa açıklama" @bind="Search" />
         </div>
-
         <div class="d-grid gap-2">
-            <button class="btn btn-primary"><i class="bi bi-search me-1"></i>Uygula</button>
-            <button class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Temizle</button>
+            <button class="btn btn-primary" @onclick="ApplyFilters">
+                <i class="bi bi-search me-1"></i>Uygula
+            </button>
+            <button class="btn btn-outline-secondary" data-bs-dismiss="offcanvas" @onclick="ResetFilters">Temizle</button>
         </div>
     </div>
 </div>
 
 @code {
-    // --- Statik veriler (placeholder) ---
+    // --- KPI demo (statik) ---
     record Kpi(string Title, int Value, double Trend, string Icon);
     List<Kpi> Kpis = new()
     {
@@ -312,17 +344,7 @@
         new("Şikayetli", 9, +2.1, "bi bi-flag")
     };
 
-    record PendingItem(string Title, string Category, string Author, DateTime DateAdded, double Rating, int ReportCount, string ThumbUrl);
-    List<PendingItem> Pending = new()
-    {
-        new("Kremalı Mantar Soslu Makarna", "Ana Yemekler", "elif.k", DateTime.Today.AddDays(-1), 4.7, 0, "https://picsum.photos/seed/p1/80/80"),
-        new("Fırında Sütlaç", "Tatlılar", "murat.c", DateTime.Today.AddDays(-2), 4.9, 2, "https://picsum.photos/seed/p2/80/80"),
-        new("Domates Çorbası", "Çorbalar", "asli.d", DateTime.Today.AddDays(-3), 4.3, 0, "https://picsum.photos/seed/p3/80/80"),
-        new("Sebzeli Kuskus", "Vejetaryen", "okan.t", DateTime.Today.AddDays(-3), 4.1, 1, "https://picsum.photos/seed/p4/80/80"),
-        new("Islak Kek", "Tatlılar", "irem.s", DateTime.Today.AddDays(-4), 4.8, 0, "https://picsum.photos/seed/p5/80/80"),
-        new("Tavuklu Wrap", "Ana Yemekler", "yagiz.b", DateTime.Today.AddDays(-5), 4.5, 3, "https://picsum.photos/seed/p6/80/80"),
-    };
-
+    // --- Raporlananlar/yorumlar demo (statik) ---
     record ReportedItem(string Title, string Reason, int Count);
     List<ReportedItem> Reported = new()
     {
@@ -338,4 +360,131 @@
         new("bora.ak", "Fotoğraflar harika görünüyor.", DateTime.Today.AddDays(-2), "https://i.pravatar.cc/60?img=16"),
         new("melis.t", "Vejetaryen alternatifi de eklenebilir mi?", DateTime.Today.AddDays(-3), "https://i.pravatar.cc/60?img=28")
     };
+
+    // --- Sunucu verisi ---
+    PagedResult<AdminPendingProductDto> Data = new();
+    int Page = 1, PageSize = 10, TotalPages = 1;
+
+    // Filtre değişkenleri (API ile uyumlu)
+    string Status = "pending";      // "pending" | "approved" | "all"
+    int? CategoryId = null;
+    string? Search = null;
+
+    // UI yardımcıları
+    bool IsLoading = false;
+    bool IsBusy = false;
+
+    // Offcanvas içindeki sayısal input için string köprü (nullable int ile binding sorunu yaşamamak için)
+    string? CategoryIdString
+    {
+        get => CategoryId?.ToString();
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) CategoryId = null;
+            else if (int.TryParse(value, out var v) && v >= 0) CategoryId = v;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    async Task Load()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        // Servisten çek
+        Data = await AdminSvc.GetAsync(Page, PageSize, Status, CategoryId, Search);
+
+        // Sayfa sayısı
+        TotalPages = Math.Max(1, (int)Math.Ceiling((double)Data.TotalCount / PageSize));
+
+        IsLoading = false;
+        StateHasChanged();
+    }
+
+    Task Go(int p)
+    {
+        Page = Math.Clamp(p, 1, TotalPages);
+        return Load();
+    }
+
+    Task Prev() => Go(Page - 1);
+    Task Next() => Go(Page + 1);
+
+    async Task ApplyFilters()
+    {
+        Page = 1; // filtre değişince başa dön
+        await Load();
+    }
+
+    async Task ResetFilters()
+    {
+        Status = "pending";
+        CategoryId = null;
+        Search = null;
+        Page = 1;
+        await Load();
+    }
+
+    async Task Approve(int id)
+    {
+        try
+        {
+            IsBusy = true;
+            var resp = await AdminSvc.ApproveAsync(id);
+            if (resp.IsSuccessStatusCode) await Load();
+            // Başarısızsa burada toast/log ekleyebilirsin.
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    Task Edit(int id)
+    {
+        // Burada detay sayfasına yönlendirme / drawer açma vs. yapılabilir.
+        // NavigationManager.NavigateTo($"/admin/products/{id}");
+        return Task.CompletedTask;
+    }
+
+    async Task Reject(int id)
+    {
+        try
+        {
+            IsBusy = true;
+            var resp = await AdminSvc.RejectAsync(id);
+            if (resp.IsSuccessStatusCode)
+            {
+                // Mevcut sayfada eleman azaldıysa gerekirse bir önceki sayfaya dön
+                // (örn. son satırı sildiysen)
+                if (Data.Items.Count == 1 && Page > 1)
+                    Page--;
+
+                await Load();
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    async Task OnSearchKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            Page = 1;
+            await Load();
+        }
+    }
+
+    void ClearSearch()
+    {
+        Search = null;
+        _ = Load();
+    }
 }

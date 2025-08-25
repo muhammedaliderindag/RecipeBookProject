@@ -15,5 +15,8 @@ public partial class Category
     public string CategoryName { get; set; } = null!;
 
     [InverseProperty("Category")]
+    public virtual ICollection<PendingProduct> PendingProducts { get; set; } = new List<PendingProduct>();
+
+    [InverseProperty("Category")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 }

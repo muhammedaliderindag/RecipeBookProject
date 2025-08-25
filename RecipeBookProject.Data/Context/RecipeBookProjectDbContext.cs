@@ -20,6 +20,8 @@ public partial class RecipeBookProjectDbContext : DbContext
 
     public virtual DbSet<FeaturedCategory> FeaturedCategories { get; set; }
 
+    public virtual DbSet<PendingProduct> PendingProducts { get; set; }
+
     public virtual DbSet<Product> Products { get; set; }
 
     public virtual DbSet<ProductAbuse> ProductAbuses { get; set; }
@@ -43,6 +45,17 @@ public partial class RecipeBookProjectDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.Comments)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Comments_Users");
+        });
+
+        modelBuilder.Entity<PendingProduct>(entity =>
+        {
+            entity.HasOne(d => d.Category).WithMany(p => p.PendingProducts)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PendingProducts_Categories");
+
+            entity.HasOne(d => d.User).WithMany(p => p.PendingProducts)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PendingProducts_Users");
         });
 
         modelBuilder.Entity<Product>(entity =>

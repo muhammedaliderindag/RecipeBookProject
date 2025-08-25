@@ -21,6 +21,7 @@ namespace RecipeBookProject.Business.Abstract
         Task<GeneralResponse<VoteRecipeDto>> GetVotedRecipeAsync(int userId, int productId, CancellationToken ct);
         Task<GeneralResponse<List<AbuseCategoryDto>>> GetAbuseCategory();
         Task<GeneralResponse<NoData>> SaveAbuseAsync(int userid, AbuseRequestDto request);
+        Task<GeneralResponse<NoData>> CreateRecipeAsync(int userid, CreateProductDto request);
 
     }
 }

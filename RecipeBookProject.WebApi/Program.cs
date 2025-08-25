@@ -67,7 +67,9 @@ builder.Services.AddScoped<IRecipeService, RecipeService>();
 builder.Services.AddScoped<IRecipeRepository, RecipeRepository>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProfileRepository, ProfileRepository>();
-
+builder.Services.AddScoped<IPendingProductRepository, PendingProductRepository>();
+builder.Services.AddScoped<IAdminPendingProductsService, AdminPendingProductsService>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

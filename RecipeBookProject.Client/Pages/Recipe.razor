@@ -5,7 +5,14 @@
 <PageTitle>Tarifler</PageTitle>
 
 <div class="container">
-    <h1 class="mb-4" style="text-align:center; padding:20px;">Tarifler</h1>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0" style="text-align:center; padding:20px;">Tarifler</h1>
+
+        <!-- Tarif Ekle Butonu -->
+        <button class="btn btn-primary" @onclick="OpenAddModal">
+            <i class="bi bi-plus-lg"></i> Tarif Ekle
+        </button>
+    </div>
 
     @if (categoryListe is not null)
     {
@@ -13,38 +20,130 @@
         {
             var cat = categoryListe[i];
             var items = allProductSlider[i];
-         //   if (items.Count == 0) continue;
-
             <ProductSlider Title="@cat.CategoryName" Items="@items" />
             <div style="margin-top:50px;"></div>
         }
     }
 </div>
 
+@* -------- Modal (Popup) -------- *@
+@if (showAddModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Yeni Tarif Ekle</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAddModal"></button>
+                </div>
+
+                <EditForm Model="@newRecipe" OnValidSubmit="SaveRecipeAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Tarif Adı</label>
+                                <InputText class="form-control" @bind-Value="newRecipe.ProductName" />
+                                <ValidationMessage For="@(() => newRecipe.ProductName)" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Kategori</label>
+                                <InputSelect class="form-select" @bind-Value="newRecipe.CategoryId">
+                                    <option value="">Seçiniz</option>
+                                    @if (categoryListe is not null)
+                                    {
+                                        @foreach (var c in categoryListe)
+                                        {
+                                            <option value="@c.CategoryId">@c.CategoryName</option>
+                                        }
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => newRecipe.CategoryId)" />
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label">Kısa Açıklama</label>
+                                <InputTextArea class="form-control" @bind-Value="newRecipe.ProductShortDesc" rows="3" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Üretim Süresi (dk)</label>
+                                <InputNumber class="form-control" @bind-Value="newRecipe.ProductionTime" />
+                                <ValidationMessage For="@(() => newRecipe.ProductionTime)" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Görsel URL</label>
+                                <InputText class="form-control" @bind-Value="newRecipe.ImageUrl" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Tarif İçeriği</label>
+                                <InputTextArea class="form-control" @bind-Value="newRecipe.Description" rows="6" />
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(newRecipe.ImageUrl))
+                            {
+                                <div class="col-12">
+                                    <img src="@newRecipe.ImageUrl" alt="Önizleme" class="img-fluid rounded" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseAddModal">Vazgeç</button>
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Kaydediliyor..." : "Kaydet")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<ProductDto>? liste;
     private List<List<ProductSlider.ProductCard>> allProductSlider = new();
     private List<CategoryDto>? categoryListe;
 
+    // Modal state
+    private bool showAddModal = false;
+    private bool isSaving = false;
+
+    // Form modeli
+    private NewRecipeModel newRecipe = new();
+
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
 
+    private async Task LoadDataAsync()
+    {
+        // Kategoriler
         var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
         categoryListe = response2?.Data ?? new List<CategoryDto>();
 
-
+        // Ürünler
         var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>("api/Recipe/getShortRecipes");
         liste = response?.Data ?? new List<ProductDto>();
 
-        var catIndex = new Dictionary<int, int>(); 
+        // Slider veri hazırlığı
+        allProductSlider.Clear();
+        var catIndex = new Dictionary<int, int>();
 
-        for (int i = 0; i < categoryListe.Count; i++)
+        for (int i = 0; i < (categoryListe?.Count ?? 0); i++)
         {
             allProductSlider.Add(new List<ProductSlider.ProductCard>());
-            catIndex[categoryListe[i].CategoryId] = i;
+            catIndex[categoryListe![i].CategoryId] = i;
         }
 
-        foreach (var item in liste)
+        foreach (var item in liste!)
         {
             var catId = item.Category?.CategoryId;
             if (catId is null) continue;
@@ -62,6 +161,76 @@
                 });
             }
         }
-
     }
+
+    private void OpenAddModal()
+    {
+        newRecipe = new(); // formu sıfırla
+        showAddModal = true;
+    }
+
+    private void CloseAddModal()
+    {
+        showAddModal = false;
+    }
+
+    private async Task SaveRecipeAsync()
+    {
+        if (isSaving) return;
+        isSaving = true;
+
+        try
+        {
+            var payload = new CreateProductDto
+            {
+                ProductName = newRecipe.ProductName!,
+                CategoryId = newRecipe.CategoryId!.Value,
+                ProductShortDesc = newRecipe.ProductShortDesc!,
+                ProductionTime = newRecipe.ProductionTime ?? 0,
+                ImageUrl = newRecipe.ImageUrl!,
+                ProductDetailedText = newRecipe.Description!
+            };
+
+            var resp = await Http.PostAsJsonAsync("api/Recipe/createrecipe", payload);
+            if (resp.IsSuccessStatusCode)
+            {
+                await LoadDataAsync();
+                showAddModal = false;
+            }
+            else
+            {
+                var text = await resp.Content.ReadAsStringAsync();
+                Console.Error.WriteLine($"Create failed: {text}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // ----- Form & Request Modelleri -----
+    public class NewRecipeModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Tarif adı zorunludur.")]
+        [System.ComponentModel.DataAnnotations.StringLength(200, ErrorMessage = "En fazla 200 karakter.")]
+        public string? ProductName { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kategori seçiniz.")]
+        public int? CategoryId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0, 1440, ErrorMessage = "0-1440 arası olmalıdır.")]
+        public int? ProductionTime { get; set; }
+
+        public string? ProductShortDesc { get; set; }
+        public string? ImageUrl { get; set; }
+
+        // Uzun açıklama / içerik
+        public string? Description { get; set; }
+    }
+
 }

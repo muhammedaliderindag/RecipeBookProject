@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RecipeBookProject.DataAcces
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RecipeBookProject.Data", "RecipeBookProject.Data\RecipeBookProject.Data.csproj", "{36084754-5740-4D2A-88C7-158F97E31E3F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RecipeBookProject.Contracts", "RecipeBookProject.Contracts\RecipeBookProject.Contracts.csproj", "{58D676C4-7057-4B32-A62B-E7120A25B753}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{36084754-5740-4D2A-88C7-158F97E31E3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36084754-5740-4D2A-88C7-158F97E31E3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36084754-5740-4D2A-88C7-158F97E31E3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58D676C4-7057-4B32-A62B-E7120A25B753}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58D676C4-7057-4B32-A62B-E7120A25B753}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58D676C4-7057-4B32-A62B-E7120A25B753}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58D676C4-7057-4B32-A62B-E7120A25B753}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

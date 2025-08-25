@@ -267,4 +267,27 @@ public class RecipeService : IRecipeService
         }
         return GeneralResponse<NoData>.Success("Başarıyla kaydedildi", 201);
     }
+
+    public async Task<GeneralResponse<NoData>> CreateRecipeAsync(int userid, CreateProductDto request)
+    {
+        var PendingProductDto = new PendingProduct
+        {
+            ProductName = request.ProductName,
+            ProductShortDesc = request.ProductShortDesc,
+            CategoryId = request.CategoryId,
+            ImageUrl = request.ImageUrl,
+            ProductionTime = request.ProductionTime ?? 0,
+            ProductDetailedText = request.ProductDetailedText,
+            CreatedAt = DateTime.UtcNow,
+            UserId = userid,
+            IsApproved = false,
+            ApprovedAt = null
+        };
+        var response = await _recipeRepository.CreateRecipeRepositoryAsync(userid, PendingProductDto);
+        if (!response)
+        {
+            throw new Exception("Kaydetme başarısız oldu.");
+        }
+        return GeneralResponse<NoData>.Success("Başarıyla kaydedildi", 201);
+    }
 }
