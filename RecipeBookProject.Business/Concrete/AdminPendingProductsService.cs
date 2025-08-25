@@ -16,10 +16,12 @@ public class AdminPendingProductsService : IAdminPendingProductsService
 {
     private readonly IPendingProductRepository _repo;
     private readonly IProductRepository _productRepo;
-    public AdminPendingProductsService(IPendingProductRepository repo,IProductRepository productRepo)
+    private readonly RecipeBookProject.Data.Context.RecipeBookProjectDbContext _db;
+    public AdminPendingProductsService(IPendingProductRepository repo,IProductRepository productRepo, RecipeBookProject.Data.Context.RecipeBookProjectDbContext db)
     {
         _repo = repo;
         _productRepo = productRepo;
+        _db = db;
     }
 
     public async Task<PagedResult<AdminPendingProductDto>> GetAsync(PendingProductsQuery input, CancellationToken ct = default)
@@ -129,5 +131,68 @@ public class AdminPendingProductsService : IAdminPendingProductsService
         await _repo.SaveChangesAsync(ct);
 
         return true;
+    }
+
+    public async Task<AdminDashboardDto> GetDashboardAsync(CancellationToken ct = default)
+    {
+        var totalProducts = await _db.Products.CountAsync(ct);
+        var pendingCount = await _db.PendingProducts.CountAsync(ct);
+        var totalComments = await _db.Comments.CountAsync(ct);
+        var totalReports = await _db.ProductAbuses.CountAsync(ct);
+
+        var since = DateTime.UtcNow.Date.AddDays(-89);
+        var weekly = await _db.Products
+            .Where(p => p.CreatedAt != null && p.CreatedAt >= since)
+            .GroupBy(p => p.CreatedAt!.Value.Date)
+            .Select(g => new WeeklyPointDto { Date = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var cat = await _db.Products
+            .GroupBy(p => p.Category.CategoryName)
+            .Select(g => new { CategoryName = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .ToListAsync(ct);
+        var sum = cat.Sum(x => x.Count);
+        var catShare = cat.Select(x => new CategoryShareDto
+        {
+            CategoryName = x.CategoryName,
+            Count = x.Count,
+            Percent = sum == 0 ? 0 : (double)x.Count * 100.0 / sum
+        }).ToList();
+
+        var reported = await _db.ProductAbuses
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(100)
+            .Select(a => new ReportedItemDto
+            {
+                Title = a.Product.ProductName,
+                Reason = a.Category.CategoryName,
+                Count = 1
+            })
+            .ToListAsync(ct);
+
+        var comments = await _db.Comments
+            .OrderByDescending(c => c.CreatedAt)
+            .Take(100)
+            .Select(c => new CommentItemDto
+            {
+                Author = c.User.FirstName + " " + c.User.LastName,
+                Text = c.Text,
+                Date = c.CreatedAt,
+                Avatar = c.User.ProfileImageUrl
+            })
+            .ToListAsync(ct);
+
+        return new AdminDashboardDto
+        {
+            TotalProducts = totalProducts,
+            PendingCount = pendingCount,
+            TotalComments = totalComments,
+            TotalReports = totalReports,
+            WeeklyPublished = weekly.OrderBy(x => x.Date).ToList(),
+            CategoryDistribution = catShare,
+            ReportedTop = reported,
+            RecentComments = comments
+        };
     }
 }

@@ -31,7 +31,7 @@
         </a> *@
     </div>
 
-    <!-- KPI Kartları (statik örnekler) -->
+    <!-- KPI Kartları -->
     <div class="row g-3 mb-3">
         @foreach (var kpi in Kpis)
         {
@@ -63,9 +63,9 @@
                 <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
                     <span class="fw-medium">Haftalık Tarif Yayınları</span>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-secondary active">7G</button>
-                        <button class="btn btn-outline-secondary">30G</button>
-                        <button class="btn btn-outline-secondary">90G</button>
+                        <button class="btn btn-outline-secondary @(ChartDays==7?"active":"")" @onclick="() => SetChartRange(7)">7G</button>
+                        <button class="btn btn-outline-secondary @(ChartDays==30?"active":"")" @onclick="() => SetChartRange(30)">30G</button>
+                        <button class="btn btn-outline-secondary @(ChartDays==90?"active":"")" @onclick="() => SetChartRange(90)">90G</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -83,16 +83,14 @@
                                 <line x1="0" y1="17" x2="100" y2="17" />
                                 <line x1="0" y1="8" x2="100" y2="8" />
                             </g>
-                            <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9 L100,35 L0,35 Z"
-                                  fill="url(#grad)" />
-                            <path d="M0,28 L10,30 L20,22 L30,24 L40,18 L50,20 L60,12 L70,17 L80,10 L90,14 L100,9"
-                                  fill="none" stroke="var(--brand)" stroke-width="1.5" />
+                            <path d="@AreaPath" fill="url(#grad)" />
+                            <path d="@LinePath" fill="none" stroke="var(--brand)" stroke-width="1.5" />
                         </svg>
                     </div>
                     <div class="d-flex gap-3 small text-body-secondary mt-2">
                         <div><span class="legend-dot me-1"></span> Yayınlanan</div>
-                        <div>Ort.: <span class="text-body fw-semibold">124 / hafta</span></div>
-                        <div>Tepe: <span class="text-body fw-semibold">176</span></div>
+                        <div>Ort.: <span class="text-body fw-semibold">@ChartAvgPerWeek.ToString("0.#", CultureInfo.GetCultureInfo("tr-TR")) / hafta</span></div>
+                        <div>Tepe: <span class="text-body fw-semibold">@ChartPeak</span></div>
                     </div>
                 </div>
             </div>
@@ -109,22 +107,22 @@
                         <div class="donut"></div>
                         <div class="donut-center">
                             <div class="h6 mb-0">Toplam</div>
-                            <div class="fw-bold">2.438</div>
+                            <div class="fw-bold">@(Dashboard?.TotalProducts.ToString("N0", CultureInfo.GetCultureInfo("tr-TR")) ?? "-")</div>
                         </div>
                     </div>
                     <ul class="list-unstyled small mb-0">
-                        <li class="d-flex align-items-center gap-2 mb-1">
-                            <span class="legend-swatch sw1"></span> Ana Yemekler <span class="ms-auto fw-semibold">34%</span>
-                        </li>
-                        <li class="d-flex align-items-center gap-2 mb-1">
-                            <span class="legend-swatch sw2"></span> Tatlılar <span class="ms-auto fw-semibold">26%</span>
-                        </li>
-                        <li class="d-flex align-items-center gap-2 mb-1">
-                            <span class="legend-swatch sw3"></span> Çorbalar <span class="ms-auto fw-semibold">18%</span>
-                        </li>
-                        <li class="d-flex align-items-center gap-2">
-                            <span class="legend-swatch sw4"></span> Vejetaryen <span class="ms-auto fw-semibold">22%</span>
-                        </li>
+                        @if (Dashboard?.CategoryDistribution is { Count: > 0 })
+                        {
+                            var idx = 0;
+                            foreach (var cd in Dashboard.CategoryDistribution.Take(4))
+                            {
+                                idx++;
+                                <li class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="legend-swatch @(idx switch {1=>"sw1",2=>"sw2",3=>"sw3",_=>"sw4"})"></span>
+                                    @cd.CategoryName <span class="ms-auto fw-semibold">@cd.Percent.ToString("0.#")%</span>
+                                </li>
+                            }
+                        }
                     </ul>
                 </div>
             </div>
@@ -262,39 +260,63 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-transparent fw-medium">Raporlananlar</div>
                 <div class="list-group list-group-flush">
-                    @foreach (var x in Reported)
+                    @if (Reported.Count == 0)
                     {
-                        <a href="#" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
-                            <i class="bi bi-flag text-danger mt-1"></i>
-                            <div class="flex-grow-1">
-                                <div class="fw-medium">@x.Title</div>
-                                <div class="small text-body-secondary">@x.Reason</div>
-                            </div>
-                            <span class="badge text-bg-danger-subtle border border-danger-subtle">@x.Count</span>
-                        </a>
+                        <div class="list-group-item small text-body-secondary">Kayıt yok</div>
                     }
+                    else
+                    {
+                        @foreach (var x in PagedReported())
+                        {
+                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-start gap-2">
+                                <i class="bi bi-flag text-danger mt-1"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-medium">@x.Title</div>
+                                    <div class="small text-body-secondary">@x.Reason</div>
+                                </div>
+                                <span class="badge text-bg-danger-subtle border border-danger-subtle">@x.Count</span>
+                            </a>
+                        }
+                    }
+                </div>
+                <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ReportPrev" disabled="@(ReportPage==1)">Önceki</button>
+                    <div class="small text-body-secondary">@(((ReportPage-1)*ReportPageSize)+1)-@((Math.Min(ReportPage*ReportPageSize, Reported.Count))) / @Reported.Count</div>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ReportNext" disabled="@(ReportPage*ReportPageSize>=Reported.Count)">Sonraki</button>
                 </div>
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-header bg-transparent fw-medium">Son Yorumlar</div>
                 <ul class="list-group list-group-flush">
-                    @foreach (var c in Comments)
+                    @if (Comments.Count == 0)
                     {
-                        <li class="list-group-item">
-                            <div class="d-flex align-items-start gap-2">
-                                <img src="@c.Avatar" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;" alt="">
-                                <div class="flex-grow-1">
-                                    <div class="d-flex">
-                                        <div class="fw-medium me-auto">@c.Author</div>
-                                        <span class="text-body-secondary small">@c.Date.ToString("dd.MM.yyyy")</span>
+                        <li class="list-group-item small text-body-secondary">Kayıt yok</li>
+                    }
+                    else
+                    {
+                        @foreach (var c in PagedComments())
+                        {
+                            <li class="list-group-item">
+                                <div class="d-flex align-items-start gap-2">
+                                    <img src="@c.Avatar" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;" alt="">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex">
+                                            <div class="fw-medium me-auto">@c.Author</div>
+                                            <span class="text-body-secondary small">@c.Date.ToString("dd.MM.yyyy")</span>
+                                        </div>
+                                        <div class="small">@c.Text</div>
                                     </div>
-                                    <div class="small">@c.Text</div>
                                 </div>
-                            </div>
-                        </li>
+                            </li>
+                        }
                     }
                 </ul>
+                <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CommentPrev" disabled="@(CommentPage==1)">Önceki</button>
+                    <div class="small text-body-secondary">@(((CommentPage-1)*CommentPageSize)+1)-@((Math.Min(CommentPage*CommentPageSize, Comments.Count))) / @Comments.Count</div>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CommentNext" disabled="@(CommentPage*CommentPageSize>=Comments.Count)">Sonraki</button>
+                </div>
             </div>
         </div>
     </div>
@@ -336,30 +358,15 @@
 @code {
     // --- KPI demo (statik) ---
     record Kpi(string Title, int Value, double Trend, string Icon);
-    List<Kpi> Kpis = new()
-    {
-        new("Toplam Tarif", 2438, +4.2, "bi bi-book"),
-        new("Onay Bekleyen", 37, -1.8, "bi bi-hourglass-split"),
-        new("Taslak", 112, +0.7, "bi bi-file-earmark-text"),
-        new("Şikayetli", 9, +2.1, "bi bi-flag")
-    };
+    List<Kpi> Kpis = new();
 
-    // --- Raporlananlar/yorumlar demo (statik) ---
-    record ReportedItem(string Title, string Reason, int Count);
-    List<ReportedItem> Reported = new()
-    {
-        new("Acılı Sos Tarifi", "Uygunsuz dil", 2),
-        new("Kolay Cheesecake", "Telif ihlali", 1),
-        new("Sihirli Diyet Çorbası", "Yanıltıcı içerik", 3)
-    };
-
-    record CommentItem(string Author, string Text, DateTime Date, string Avatar);
-    List<CommentItem> Comments = new()
-    {
-        new("zeynep.oz", "Tarifteki ölçüler çok net, teşekkürler!", DateTime.Today.AddDays(-1), "https://i.pravatar.cc/60?img=12"),
-        new("bora.ak", "Fotoğraflar harika görünüyor.", DateTime.Today.AddDays(-2), "https://i.pravatar.cc/60?img=16"),
-        new("melis.t", "Vejetaryen alternatifi de eklenebilir mi?", DateTime.Today.AddDays(-3), "https://i.pravatar.cc/60?img=28")
-    };
+    // --- Dashboard verileri ---
+    RecipeBookProject.Contracts.Admin.AdminDashboardDto? Dashboard;
+    List<RecipeBookProject.Contracts.Admin.ReportedItemDto> Reported = new();
+    List<RecipeBookProject.Contracts.Admin.CommentItemDto> Comments = new();
+    // Paginations for side lists
+    int ReportPage = 1, ReportPageSize = 10;
+    int CommentPage = 1, CommentPageSize = 10;
 
     // --- Sunucu verisi ---
     PagedResult<AdminPendingProductDto> Data = new();
@@ -396,7 +403,26 @@
         StateHasChanged();
 
         // Servisten çek
-        Data = await AdminSvc.GetAsync(Page, PageSize, Status, CategoryId, Search);
+        var dashTask = AdminSvc.GetDashboardAsync();
+        var listTask = AdminSvc.GetAsync(Page, PageSize, Status, CategoryId, Search);
+        await Task.WhenAll(dashTask, listTask);
+        Dashboard = dashTask.Result;
+        Data = listTask.Result;
+
+        // KPI'ları doldur
+        if (Dashboard is not null)
+        {
+            Kpis = new()
+            {
+                new("Toplam Tarif", Dashboard.TotalProducts, +0, "bi bi-book"),
+                new("Onay Bekleyen", Dashboard.PendingCount, +0, "bi bi-hourglass-split"),
+                new("Yorum", Dashboard.TotalComments, +0, "bi bi-chat-dots"),
+                new("Şikayet", Dashboard.TotalReports, +0, "bi bi-flag")
+            };
+            Reported = Dashboard.ReportedTop;
+            Comments = Dashboard.RecentComments;
+            ComputeChartPaths();
+        }
 
         // Sayfa sayısı
         TotalPages = Math.Max(1, (int)Math.Ceiling((double)Data.TotalCount / PageSize));
@@ -404,6 +430,69 @@
         IsLoading = false;
         StateHasChanged();
     }
+
+    // --- Grafik için SVG path üretimi ---
+    string AreaPath = string.Empty;
+    string LinePath = string.Empty;
+    int ChartDays = 7;
+    double ChartAvgPerWeek = 0;
+    int ChartPeak = 0;
+    void ComputeChartPaths()
+    {
+        if (Dashboard?.WeeklyPublished is null || Dashboard.WeeklyPublished.Count == 0)
+        {
+            AreaPath = ""; LinePath = ""; return;
+        }
+        var cutoff = DateTime.UtcNow.Date.AddDays(-(ChartDays - 1));
+        var points = Dashboard.WeeklyPublished.Where(x => x.Date >= cutoff).OrderBy(x => x.Date).ToList();
+        int n = points.Count;
+        double max = Math.Max(1, points.Max(p => (double)p.Count));
+        ChartPeak = (int)max;
+        // average per week on the selected window
+        var total = points.Sum(p => p.Count);
+        var weeks = ChartDays / 7.0;
+        ChartAvgPerWeek = weeks <= 0 ? 0 : total / weeks;
+        Func<int, double> xMap = i => n == 1 ? 100 : (100.0 * i / (n - 1));
+        Func<int, double, double> yMap = (i, v) => 35 - (v / max) * 26; // top grid at ~9
+
+        var path = new System.Text.StringBuilder();
+        var line = new System.Text.StringBuilder();
+        for (int i = 0; i < n; i++)
+        {
+            var x = xMap(i);
+            var y = yMap(i, points[i].Count);
+            if (i == 0)
+            {
+                path.Append($"M0,{y:0.##} ");
+                line.Append($"M0,{y:0.##} ");
+            }
+            else
+            {
+                path.Append($"L{x:0.##},{y:0.##} ");
+                line.Append($"L{x:0.##},{y:0.##} ");
+            }
+        }
+        // close area to bottom
+        path.Append(" L100,35 L0,35 Z");
+        AreaPath = path.ToString();
+        LinePath = line.ToString();
+    }
+
+    void SetChartRange(int days)
+    {
+        ChartDays = days;
+        ComputeChartPaths();
+        StateHasChanged();
+    }
+
+    IEnumerable<RecipeBookProject.Contracts.Admin.ReportedItemDto> PagedReported()
+        => Reported.Skip((ReportPage - 1) * ReportPageSize).Take(ReportPageSize);
+    IEnumerable<RecipeBookProject.Contracts.Admin.CommentItemDto> PagedComments()
+        => Comments.Skip((CommentPage - 1) * CommentPageSize).Take(CommentPageSize);
+    void ReportPrev() { if (ReportPage > 1) ReportPage--; }
+    void ReportNext() { if (ReportPage * ReportPageSize < Reported.Count) ReportPage++; }
+    void CommentPrev() { if (CommentPage > 1) CommentPage--; }
+    void CommentNext() { if (CommentPage * CommentPageSize < Comments.Count) CommentPage++; }
 
     Task Go(int p)
     {

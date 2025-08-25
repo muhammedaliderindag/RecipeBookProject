@@ -47,4 +47,11 @@ public class AdminProductsController : ControllerBase
         var ok = await _svc.RejectAsync(id, ct);
         return ok ? NoContent() : NotFound();
     }
+
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<AdminDashboardDto>> GetDashboard(CancellationToken ct)
+    {
+        var dto = await _svc.GetDashboardAsync(ct);
+        return Ok(dto);
+    }
 }

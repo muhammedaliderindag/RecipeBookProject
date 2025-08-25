@@ -25,4 +25,7 @@ public class AdminProductsService
 
     public Task<HttpResponseMessage> RejectAsync(int id)
         => _http.PostAsync($"api/admin/pending-products/{id}/reject", content: null);
+
+    public async Task<AdminDashboardDto?> GetDashboardAsync(CancellationToken ct = default)
+        => await _http.GetFromJsonAsync<AdminDashboardDto>("api/admin/pending-products/dashboard", ct);
 }

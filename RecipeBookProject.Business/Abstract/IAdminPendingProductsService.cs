@@ -10,6 +10,7 @@ namespace RecipeBookProject.Business.Abstract
     public interface IAdminPendingProductsService
     {
         Task<PagedResult<AdminPendingProductDto>> GetAsync(PendingProductsQuery input, CancellationToken ct = default);
+        Task<AdminDashboardDto> GetDashboardAsync(CancellationToken ct = default);
         Task<bool> ApproveAsync(int productId, CancellationToken ct = default);
         Task<bool> RejectAsync(int productId, CancellationToken ct = default);
     }
