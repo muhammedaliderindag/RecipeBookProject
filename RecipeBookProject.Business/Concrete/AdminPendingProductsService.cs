@@ -1,7 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RecipeBookProject.Business.Abstract;
 using RecipeBookProject.Contracts.Admin;
-using RecipeBookProject.Contracts.Common;
+using RecipeBookProject.Contracts.Recipes;
+using RecipeBookProject.Data.Context;
 using RecipeBookProject.Data.Entities;
 using RecipeBookProject.DataAccess.Repositories.Abstract;
 using System;
@@ -53,32 +54,62 @@ public class AdminPendingProductsService : IAdminPendingProductsService
         var total = await q.CountAsync(ct);
 
         // Sıralama + sayfalama + MANUEL PROJECTION
-        var items = await q
+        // Aynı filtreleri burada da uygula (sabit !x.IsApproved filtresini kaldır)
+        IQueryable<PendingProduct> resultQuery = _repo.Query()
+            .Include(x => x.Category)
+            .Include(x => x.User)
+            .Include(x => x.RecipeIngredients)
+                .ThenInclude(ri => ri.Ingredient);
+
+        // Status filtrelerini tekrar uygula
+        if (!string.Equals(input.Status, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(input.Status, "pending", StringComparison.OrdinalIgnoreCase))
+                resultQuery = resultQuery.Where(x => !x.IsApproved);
+            else if (string.Equals(input.Status, "approved", StringComparison.OrdinalIgnoreCase))
+                resultQuery = resultQuery.Where(x => x.IsApproved);
+        }
+
+        // Diğer filtreleri de uygula
+        if (input.CategoryId is > 0)
+            resultQuery = resultQuery.Where(x => x.CategoryId == input.CategoryId);
+
+        if (!string.IsNullOrWhiteSpace(input.Query))
+        {
+            var query = input.Query.Trim();
+            resultQuery = resultQuery.Where(x => x.ProductName.Contains(query) || x.ProductShortDesc.Contains(query));
+        }
+
+        var result = await resultQuery
             .OrderByDescending(x => x.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((input.Page - 1) * input.PageSize)
+            .Take(input.PageSize)
             .Select(x => new AdminPendingProductDto
             {
                 ProductId = x.ProductId,
                 ProductName = x.ProductName,
                 ProductShortDesc = x.ProductShortDesc,
-                CategoryName = x.Category.CategoryName, 
+                ProductDetailedText = x.ProductDetailedText,
+                CategoryId = x.CategoryId,
                 ImageUrl = x.ImageUrl,
                 ProductionTime = x.ProductionTime,
                 CreatedAt = x.CreatedAt,
-                ApprovedAt = x.ApprovedAt,
-                IsApproved = x.IsApproved,
-                Author = x.User.FirstName + " " + x.User.LastName
+                CategoryName = x.Category.CategoryName,
+                UserName = $"{x.User.FirstName} {x.User.LastName}",
+                BaseServingSize = x.BaseServingSize, // PendingProduct'tan al
+                IsApproved = x.IsApproved, // Onay durumu
+                ApprovedAt = x.ApprovedAt, // Onaylanma tarihi
+                Ingredients = x.RecipeIngredients.Select(ri => new RecipeIngredientDto
+                {
+                    IngredientId = ri.IngredientId,
+                    Quantity = ri.Quantity,
+                    Unit = ri.Unit,
+                    Notes = ri.Notes
+                }).ToList()
             })
             .ToListAsync(ct);
 
-        return new PagedResult<AdminPendingProductDto>
-        {
-            Items = items,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = total
-        };
+        return new PagedResult<AdminPendingProductDto>(result, total, page, pageSize);
     }
 
 
@@ -91,6 +122,10 @@ public class AdminPendingProductsService : IAdminPendingProductsService
         // Zaten onaylıysa tekrar ekleme yapma (idempotent)
         if (!entity.IsApproved)
         {
+            // Debug: ImageUrl kopyalama kontrolü
+            Console.WriteLine($"DEBUG: ApproveAsync - PendingProduct ImageUrl: {entity.ImageUrl}");
+            Console.WriteLine($"DEBUG: ApproveAsync - PendingProduct ImageUrl length: {entity.ImageUrl?.Length}");
+            
             // --- Manuel mapping: PendingProduct -> Product
             var newProduct = new Product
             {
@@ -100,21 +135,39 @@ public class AdminPendingProductsService : IAdminPendingProductsService
                 ProductDetailedText = entity.ProductDetailedText,
                 CategoryId = entity.CategoryId,
                 FeaturedCategoryId = null,                  // İstersen business kuralınla set edebilirsin
-                ImageUrl = entity.ImageUrl?.Length > 50
-                                        ? entity.ImageUrl.Substring(0, 50) // Product.ImageUrl [StringLength(50)]
-                                        : entity.ImageUrl,
+                ImageUrl = entity.ImageUrl, // Product.ImageUrl field'ı sınırsız, kısaltmaya gerek yok
                 ProductionTime = entity.ProductionTime, // int -> int?
+                BaseServingSize = entity.BaseServingSize, // BaseServingSize'ı da kopyala
                 CreatedAt = DateTime.UtcNow
             };
+            
+            Console.WriteLine($"DEBUG: ApproveAsync - New Product ImageUrl: {newProduct.ImageUrl}");
+            Console.WriteLine($"DEBUG: ApproveAsync - New Product ImageUrl length: {newProduct.ImageUrl?.Length}");
 
+            // Önce newProduct'ı kaydet ve ProductId'yi al
             await _productRepo.AddAsync(newProduct, ct);
+            await _productRepo.SaveChangesAsync(ct); // ProductId'yi almak için önce kaydet
 
-            // Pending’i onayla
+            // RecipeIngredients'lara ProductId'yi ekle (PendingProductId'yi silme)
+            var recipeIngredients = await _db.RecipeIngredients
+                .Where(ri => ri.PendingProductId == productId)
+                .ToListAsync(ct);
+
+            foreach (var ingredient in recipeIngredients)
+            {
+                ingredient.ProductId = newProduct.ProductId; // Şimdi ProductId dolu olacak
+            }
+
+            // Pending'i onayla
             entity.IsApproved = true;
             entity.ApprovedAt = DateTime.UtcNow;
             await _repo.UpdateAsync(entity, ct);
 
-            // Aynı DbContext scope’unda olduğumuz için tek SaveChanges tüm değişiklikleri yazar
+            // Products tablosunda görünürlüğü true yap
+            newProduct.IsVisible = true;
+            _db.Products.Update(newProduct);
+
+            // Aynı DbContext scope'unda olduğumuz için tek SaveChanges tüm değişiklikleri yazar
             await _productRepo.SaveChangesAsync(ct);
         }
 
@@ -133,7 +186,124 @@ public class AdminPendingProductsService : IAdminPendingProductsService
         return true;
     }
 
-    public async Task<AdminDashboardDto> GetDashboardAsync(CancellationToken ct = default)
+    public async Task<bool> UpdateProductAsync(int productId, UpdateProductDto dto, CancellationToken ct = default)
+    {
+        var product = await _repo.GetByIdAsync(productId, ct);
+        if (product == null) return false;
+
+        // Ürün bilgilerini güncelle
+        product.ProductName = dto.ProductName;
+        product.ProductShortDesc = dto.ProductShortDesc;
+        product.CategoryId = dto.CategoryId;
+        product.ImageUrl = dto.ImageUrl;
+        product.ProductionTime = (int)dto.ProductionTime;
+        product.ProductDetailedText = dto.ProductDetailedText;
+        product.BaseServingSize = dto.BaseServingSize;
+
+        // Mevcut malzemeleri sil (hem ProductId hem PendingProductId ile)
+        var existingIngredients = await _db.RecipeIngredients
+            .Where(ri => ri.PendingProductId == productId || ri.ProductId == productId)
+            .ToListAsync(ct);
+        
+        _db.RecipeIngredients.RemoveRange(existingIngredients);
+
+        // Yeni malzemeleri ekle
+        foreach (var ingredientDto in dto.Ingredients.Where(i => i.IngredientId > 0))
+        {
+            var recipeIngredient = new RecipeIngredient
+            {
+                PendingProductId = productId, // PendingProduct olarak kalacak
+                ProductId = null, // ProductId NULL olacak
+                IngredientId = ingredientDto.IngredientId,
+                Quantity = ingredientDto.Quantity,
+                Unit = ingredientDto.Unit,
+                Notes = ingredientDto.Notes,
+                ServingSize = dto.BaseServingSize
+            };
+            _db.RecipeIngredients.Add(recipeIngredient);
+        }
+
+        // PendingProduct'ı güncelle
+        await _repo.UpdateAsync(product, ct);
+        
+        // Tüm değişiklikleri kaydet
+        var allChangesSaved = await _db.SaveChangesAsync(ct) > 0;
+        
+        Console.WriteLine($"DEBUG: UpdateProductAsync - Product updated: {allChangesSaved}");
+        Console.WriteLine($"DEBUG: UpdateProductAsync - Ingredients count: {dto.Ingredients?.Count ?? 0}");
+        
+        return allChangesSaved;
+    }
+
+    public async Task<bool> ToggleProductVisibilityAsync(int productId, CancellationToken ct = default)
+    {
+        var product = await _repo.GetByIdAsync(productId, ct);
+        if (product == null) return false;
+
+        // Görünürlüğü değiştir (onaylı <-> onay bekliyor)
+        product.IsApproved = !product.IsApproved;
+        
+        if (product.IsApproved)
+        {
+            product.ApprovedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            product.ApprovedAt = null;
+        }
+
+        // Eğer onaylanmışsa Products tablosunda da görünürlüğü güncelle
+        if (product.IsApproved)
+        {
+            // PendingProducts tablosundaki ProductId ile Products tablosunda arama yap
+            var existingProduct = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == productId, ct);
+            Console.WriteLine($"DEBUG: ToggleVisibility - Onaylandı, ProductId: {productId}, Found Product: {existingProduct != null}");
+            if (existingProduct != null)
+            {
+                existingProduct.IsVisible = true;
+                _db.Products.Update(existingProduct);
+                Console.WriteLine($"DEBUG: ToggleVisibility - Product.IsVisible set to true for ProductId: {productId}");
+            }
+        }
+        else
+        {
+            // Onay kaldırıldıysa Products tablosunda gizle
+            var existingProduct = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == productId, ct);
+            Console.WriteLine($"DEBUG: ToggleVisibility - Onay kaldırıldı, ProductId: {productId}, Found Product: {existingProduct != null}");
+            if (existingProduct != null)
+            {
+                Console.WriteLine($"DEBUG: ToggleVisibility - Before: Product.IsVisible = {existingProduct.IsVisible}");
+                existingProduct.IsVisible = false;
+                _db.Products.Update(existingProduct);
+                Console.WriteLine($"DEBUG: ToggleVisibility - After: Product.IsVisible = {existingProduct.IsVisible}");
+                Console.WriteLine($"DEBUG: ToggleVisibility - Product.IsVisible set to false for ProductId: {productId}");
+            }
+            else
+            {
+                Console.WriteLine($"DEBUG: ToggleVisibility - Product not found in Products table for ProductId: {productId}");
+            }
+        }
+
+        await _repo.UpdateAsync(product, ct);
+        
+        // Hem PendingProducts hem de Products tablosundaki değişiklikleri kaydet
+        var saveResult = await _db.SaveChangesAsync(ct);
+        Console.WriteLine($"DEBUG: ToggleVisibility - SaveChangesAsync result: {saveResult}");
+        
+        // SaveChangesAsync sonrasında Products tablosundaki değeri tekrar kontrol et
+        if (saveResult > 0)
+        {
+            var verifyProduct = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == productId, ct);
+            if (verifyProduct != null)
+            {
+                Console.WriteLine($"DEBUG: ToggleVisibility - Verification: Product.IsVisible = {verifyProduct.IsVisible}");
+            }
+        }
+        
+        return saveResult > 0;
+    }
+
+    public async Task<AdminDashboardDto> GetDashboardAsync(int days, CancellationToken ct = default)
     {
         var totalProducts = await _db.Products.CountAsync(ct);
         var pendingCount = await _db.PendingProducts.CountAsync(ct);

@@ -1,0 +1,175 @@
+@page "/recipe/{Id:int}/ingredients"
+@using RecipeBookProject.Contracts.Recipes
+@using Microsoft.AspNetCore.Components.Forms
+@using RecipeBookProject.Client.Models
+@inject HttpClient Http
+
+<PageTitle>Tarif Detayı - @(recipe?.ProductName ?? "Yükleniyor...")</PageTitle>
+
+<div class="container py-4">
+    @if (recipe == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Yükleniyor...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <!-- Sol Kolon: Tarif Bilgileri -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    @if (!string.IsNullOrEmpty(recipe.ImageUrl))
+                    {
+                        <img src="@recipe.ImageUrl" class="card-img-top" alt="@recipe.ProductName" style="max-height: 400px; object-fit: cover;" />
+                    }
+                    <div class="card-body">
+                        <h1 class="card-title">@recipe.ProductName</h1>
+                        <p class="text-muted">@recipe.CategoryName</p>
+                        <p class="card-text">@recipe.ProductShortDesc</p>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Hazırlama Süresi:</strong> @recipe.ProductionTime dakika
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Orijinal Porsiyon:</strong> @recipe.BaseServingSize kişilik
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(recipe.ProductDetailedText))
+                        {
+                            <div class="mt-4">
+                                <h5>Hazırlanışı</h5>
+                                <div class="border rounded p-3 bg-light">
+                                    @((MarkupString)recipe.ProductDetailedText)
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Kolon: Malzemeler ve Porsiyon -->
+            <div class="col-lg-4">
+                <div class="card sticky-top" style="top: 2rem;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Malzemeler</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Porsiyon Seçici -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Kaç Kişilik Hazırlayacaksınız?</label>
+                            <div class="input-group">
+                                <InputNumber class="form-control" @bind-Value="selectedServingSize" min="1" max="50" />
+                                <span class="input-group-text">kişi</span>
+                            </div>
+                            <small class="text-muted">Orijinal: @recipe.BaseServingSize kişilik</small>
+                        </div>
+
+                        <!-- Malzeme Listesi -->
+                        @if (recipe.Ingredients.Count == 0)
+                        {
+                            <p class="text-muted text-center">Bu tarif için malzeme bilgisi bulunmuyor.</p>
+                        }
+                        else
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var ingredient in recipe.Ingredients)
+                                {
+                                    var scaledQuantity = CalculateScaledQuantity(ingredient.Quantity, ingredient.BaseServingSize, selectedServingSize);
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+@*                                             <strong>@ingredient.IngredientName</strong>
+ *@                                            @if (!string.IsNullOrEmpty(ingredient.Notes))
+                                            {
+                                                <br><small class="text-muted">@ingredient.Notes</small>
+                                            }
+                                        </div>
+                                        <span class="badge bg-primary rounded-pill">
+                                            @scaledQuantity.ToString("0.##") @ingredient.Unit
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Toplam Malzeme Özeti -->
+                            <div class="mt-3 p-3 bg-light rounded">
+                                <h6 class="mb-2">Özet</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted">Orijinal Porsiyon:</small><br>
+                                        <strong>@recipe.BaseServingSize kişi</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Seçilen Porsiyon:</small><br>
+                                        <strong>@selectedServingSize kişi</strong>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">Çarpan:</small><br>
+                                    <strong>@(GetScalingFactor(recipe.BaseServingSize, selectedServingSize).ToString("0.##"))x</strong>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ProductWithIngredientsDto? recipe;
+    private int selectedServingSize = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecipeAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id != 0)
+        {
+            await LoadRecipeAsync();
+        }
+    }
+
+    private async Task LoadRecipeAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<ProductWithIngredientsDto>>($"api/Recipe/GetRecipeWithIngredients/{Id}");
+            recipe = response?.Data;
+            
+            if (recipe != null)
+            {
+                selectedServingSize = recipe.BaseServingSize;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recipe: {ex.Message}");
+        }
+    }
+
+    private decimal CalculateScaledQuantity(decimal originalQuantity, int originalServingSize, int newServingSize)
+    {
+        if (originalServingSize <= 0) return originalQuantity;
+        
+        var scalingFactor = (decimal)newServingSize / originalServingSize;
+        return originalQuantity * scalingFactor;
+    }
+
+    private decimal GetScalingFactor(int originalServingSize, int newServingSize)
+    {
+        if (originalServingSize <= 0) return 1;
+        return (decimal)newServingSize / originalServingSize;
+    }
+}

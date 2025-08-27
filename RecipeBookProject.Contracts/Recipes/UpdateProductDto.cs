@@ -1,19 +1,33 @@
-﻿using RecipeBookProject.Contracts.Recipes;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
-namespace RecipeBookProject.Client.Models
+namespace RecipeBookProject.Contracts.Recipes
 {
-    public class ProductDto
+    public class UpdateProductDto
     {
         public int ProductId { get; set; }
+        
+        [Required, StringLength(200)]
         public string ProductName { get; set; } = null!;
+        
+        [Required, StringLength(500)]
         public string ProductShortDesc { get; set; } = null!;
+        
+        [Required]
         public int CategoryId { get; set; }
-        public CategoryDto? Category { get; set; } = null!;
-        public FeaturedCategoryDto? FeaturedCategory { get; set; } = null!;
-        public string ImageUrl { get; set; } = null!;
+        
+        public string? ImageUrl { get; set; }
+        
+        [Range(0, 1440)]
         public int? ProductionTime { get; set; }
+        
+        [Required]
         public string ProductDetailedText { get; set; } = null!;
+        
+        [Range(1, 20)]
         public int BaseServingSize { get; set; } = 1;
+        
         public List<RecipeIngredientDto> Ingredients { get; set; } = new();
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using RecipeBookProject.Data.Entities;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace RecipeBookProject.Business.Models
+namespace RecipeBookProject.Contracts
 {
     public class GeneralResponse<T>
     {

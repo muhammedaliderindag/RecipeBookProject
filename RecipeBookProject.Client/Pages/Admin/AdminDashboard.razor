@@ -1,8 +1,11 @@
 ﻿@page "/admin"
 @using System.Globalization
-@using RecipeBookProject.Contracts.Common
 @using RecipeBookProject.Contracts.Admin
+@using RecipeBookProject.Contracts.Recipes
+@using Microsoft.AspNetCore.Components.Forms
 @inject RecipeBookProject.Client.Services.AdminProductsService AdminSvc
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
 <!-- Erişilebilirlik -->
 <h1 class="visually-hidden">Yönetim Paneli</h1>
@@ -21,6 +24,10 @@
                 data-bs-toggle="offcanvas" data-bs-target="#filters">
             <i class="bi bi-funnel me-1"></i>Filtreler
         </button>
+
+        <a class="btn btn-outline-primary" href="/admin/ingredients">
+            <i class="bi bi-box-seam me-1"></i>Malzemeler
+        </a>
 
 @*         <a class="btn btn-outline-primary" href="#">
             <i class="bi bi-clipboard-check me-1"></i>Onay Kuyruğu
@@ -191,38 +198,55 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>@r.Author</td>
+                                        <td>@r.UserName</td>
                                         <td>@r.CreatedAt.ToString("dd.MM.yyyy")</td>
                                         <td>@r.CategoryName</td>
                                         <td class="text-center">@r.ProductionTime dk</td>
                                         <td class="text-center">
                                             @if (r.IsApproved)
                                             {
-                                                <span class="badge text-bg-success-subtle border border-success-subtle text-black">Onaylı</span>
+                                                <span class="badge text-bg-success-subtle border border-success-subtle text-success">
+                                                    <i class="bi bi-check-circle me-1"></i>Onaylandı
+                                                </span>
+                                                @if (r.ApprovedAt.HasValue)
+                                                {
+                                                    <div class="small text-muted mt-1">@r.ApprovedAt.Value.ToString("dd.MM.yyyy HH:mm")</div>
+                                                }
                                             }
                                             else
                                             {
-                                                <span class="badge text-bg-warning-subtle border border-warning-subtle text-black">Bekliyor</span>
+                                                <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning">
+                                                    <i class="bi bi-hourglass-split me-1"></i>Bekliyor
+                                                </span>
                                             }
                                         </td>
-
-                                            <td class="text-end">
-                                                <div class="btn-group btn-group-sm">
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm">
                                                 @if (!r.IsApproved)
                                                 {
                                                     <button class="btn btn-outline-success" disabled="@IsBusy" title="Onayla" @onclick="() => Approve(r.ProductId)">
                                                         <i class="bi bi-check2"></i>
                                                     </button>
-                                                    }
-                                                    @*                                                 <button class="btn btn-outline-warning" disabled="@IsBusy" title="Düzenle" @onclick="() => Edit(r.ProductId)">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button> *@
+                                                    <button class="btn btn-outline-primary" disabled="@IsBusy" title="Düzenle" @onclick="() => EditProduct(r)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
                                                     <button class="btn btn-outline-danger" disabled="@IsBusy" title="Reddet" @onclick="() => Reject(r.ProductId)">
                                                         <i class="bi bi-x"></i>
                                                     </button>
-                                                </div>
-                                            </td>
-
+                                                }
+                                                else
+                                                {
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-primary" disabled="@IsBusy" title="Düzenle" @onclick="() => EditProduct(r)">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-warning" disabled="@IsBusy" title="@(r.IsApproved ? "Gizle" : "Göster")" @onclick="() => ToggleVisibility(r.ProductId)">
+                                                            <i class="bi @(r.IsApproved ? "bi-eye-slash" : "bi-eye")"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </td>
                                     </tr>
                                 }
                             }
@@ -355,6 +379,147 @@
     </div>
 </div>
 
+<!-- Düzenleme Modal -->
+@if (showEditModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Tarif Düzenle</h5>
+                    <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                </div>
+
+                <EditForm Model="@editingProduct" OnValidSubmit="SaveEditedProduct">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Tarif Adı</label>
+                                <InputText class="form-control" @bind-Value="editingProduct.ProductName" />
+                                <ValidationMessage For="@(() => editingProduct.ProductName)" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Kategori</label>
+                                <InputSelect class="form-select" @bind-Value="editingProduct.CategoryId">
+                                    <option value="">Seçiniz</option>
+                                    @if (categories != null)
+                                    {
+                                        @foreach (var c in categories)
+                                        {
+                                            <option value="@c.CategoryId">@c.CategoryName</option>
+                                        }
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => editingProduct.CategoryId)" />
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label">Kısa Açıklama</label>
+                                <InputTextArea class="form-control" @bind-Value="editingProduct.ProductShortDesc" rows="3" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Üretim Süresi (dk)</label>
+                                <InputNumber class="form-control" @bind-Value="editingProduct.ProductionTime" />
+                                <ValidationMessage For="@(() => editingProduct.ProductionTime)" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Kaç Kişilik</label>
+                                <InputNumber class="form-control" @bind-Value="editingProduct.BaseServingSize" min="1" max="20" />
+                                <ValidationMessage For="@(() => editingProduct.BaseServingSize)" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Tarif Görseli</label>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <InputFile class="form-control" OnChange="OnImageFileSelected" accept="image/*" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="UploadImage" disabled="@(selectedImageFile == null)">
+                                        <i class="bi bi-upload"></i> Yükle
+                                    </button>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(editingProduct.ImageUrl))
+                                {
+                                    <div class="mt-2">
+                                        <img src="@editingProduct.ImageUrl" alt="Önizleme" class="img-fluid rounded" style="max-height: 200px;" />
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Tarif İçeriği</label>
+                                <InputTextArea class="form-control" @bind-Value="editingProduct.ProductDetailedText" rows="6" />
+                            </div>
+
+                            <!-- Malzemeler Bölümü -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">Malzemeler</h6>
+                                        <button type="button" class="btn btn-sm btn-primary" @onclick="AddIngredient">
+                                            <i class="bi bi-plus"></i> Malzeme Ekle
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (editingProduct.Ingredients.Count == 0)
+                                        {
+                                            <p class="text-muted text-center">Henüz malzeme eklenmemiş.</p>
+                                        }
+                                        else
+                                        {
+                                            @for (int i = 0; i < editingProduct.Ingredients.Count; i++)
+                                            {
+                                                var ingredient = editingProduct.Ingredients[i];
+                                                var index = i;
+                                                <div class="row g-2 mb-2 align-items-center">
+                                                    <div class="col-md-4">
+                                                        <InputSelect class="form-select" @bind-Value="ingredient.IngredientId">
+                                                            <option value="0">Malzeme Seçin</option>
+                                                            @foreach (var ing in availableIngredients)
+                                                            {
+                                                                <option value="@ing.IngredientId">@ing.Name</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <InputNumber class="form-control" @bind-Value="ingredient.Quantity" min="0" step="0.1" />
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <InputText class="form-control" @bind-Value="ingredient.Unit" placeholder="Birim" />
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <InputText class="form-control" @bind-Value="ingredient.Notes" placeholder="Not (opsiyonel)" />
+                                                    </div>
+                                                    <div class="col-md-1">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveIngredient(index)">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseEditModal">Vazgeç</button>
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Kaydediliyor..." : "Kaydet")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // --- KPI demo (statik) ---
     record Kpi(string Title, int Value, double Trend, string Icon);
@@ -369,7 +534,7 @@
     int CommentPage = 1, CommentPageSize = 10;
 
     // --- Sunucu verisi ---
-    PagedResult<AdminPendingProductDto> Data = new();
+    PagedResult<AdminPendingProductDto> Data = new PagedResult<AdminPendingProductDto>(new List<AdminPendingProductDto>(), 0, 1, 10);
     int Page = 1, PageSize = 10, TotalPages = 1;
 
     // Filtre değişkenleri (API ile uyumlu)
@@ -381,7 +546,15 @@
     bool IsLoading = false;
     bool IsBusy = false;
 
-    // Offcanvas içindeki sayısal input için string köprü (nullable int ile binding sorunu yaşamamak için)
+    // Düzenleme modalı için değişkenler
+    bool showEditModal = false;
+    AdminPendingProductDto editingProduct = new();
+    List<RecipeBookProject.Contracts.Recipes.IngredientDto> availableIngredients = new();
+    List<CategoryDto> categories = new();
+    IBrowserFile? selectedImageFile;
+    bool isSaving = false;
+
+    // Offcanvas içindeki sayısal input için string köprü (nullable int ile binding sorunu yaşamak için)
     string? CategoryIdString
     {
         get => CategoryId?.ToString();
@@ -404,7 +577,24 @@
 
         // Servisten çek
         var dashTask = AdminSvc.GetDashboardAsync();
-        var listTask = AdminSvc.GetAsync(Page, PageSize, Status, CategoryId, Search);
+        // Replace this block in the Load() method:
+        // var listTask = AdminSvc.GetAsync(new PendingProductsQuery
+        // {
+        //     Page = Page,
+        //     PageSize = PageSize,
+        //     Status = Status,
+        //     CategoryId = CategoryId,
+        //     Search = Search
+        // });
+
+        // With this block, removing the Search property (since PendingProductsQuery does not have it):
+        var listTask = AdminSvc.GetAsync(new PendingProductsQuery
+        {
+            Page = Page,
+            PageSize = PageSize,
+            Status = Status,
+            CategoryId = CategoryId
+        });
         await Task.WhenAll(dashTask, listTask);
         Dashboard = dashTask.Result;
         Data = listTask.Result;
@@ -429,6 +619,32 @@
 
         IsLoading = false;
         StateHasChanged();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
+            categories = response?.Data ?? new List<CategoryDto>();
+        }
+        catch
+        {
+            categories = new List<CategoryDto>();
+        }
+    }
+
+    private async Task LoadIngredientsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<List<RecipeBookProject.Contracts.Recipes.IngredientDto>>>("api/Recipe/GetAllIngredients");
+            availableIngredients = response?.Data ?? new List<RecipeBookProject.Contracts.Recipes.IngredientDto>();
+        }
+        catch
+        {
+            availableIngredients = new List<RecipeBookProject.Contracts.Recipes.IngredientDto>();
+        }
     }
 
     // --- Grafik için SVG path üretimi ---
@@ -533,13 +749,6 @@
         }
     }
 
-    Task Edit(int id)
-    {
-        // Burada detay sayfasına yönlendirme / drawer açma vs. yapılabilir.
-        // NavigationManager.NavigateTo($"/admin/products/{id}");
-        return Task.CompletedTask;
-    }
-
     async Task Reject(int id)
     {
         try
@@ -562,6 +771,23 @@
         }
     }
 
+    async Task ToggleVisibility(int id)
+    {
+        try
+        {
+            IsBusy = true;
+            var resp = await AdminSvc.ToggleVisibilityAsync(id);
+            if (resp.IsSuccessStatusCode)
+            {
+                await Load();
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     async Task OnSearchKeydown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
@@ -575,5 +801,115 @@
     {
         Search = null;
         _ = Load();
+    }
+
+    private async Task EditProduct(AdminPendingProductDto product)
+    {
+        editingProduct = new AdminPendingProductDto
+        {
+            ProductId = product.ProductId,
+            ProductName = product.ProductName,
+            ProductShortDesc = product.ProductShortDesc,
+            CategoryId = product.CategoryId,
+            ImageUrl = product.ImageUrl,
+            ProductionTime = product.ProductionTime,
+            ProductDetailedText = product.ProductDetailedText,
+            BaseServingSize = product.BaseServingSize,
+            Ingredients = product.Ingredients ?? new List<RecipeBookProject.Contracts.Recipes.RecipeIngredientDto>()
+        };
+
+        await LoadCategoriesAsync();
+        await LoadIngredientsAsync();
+        showEditModal = true;
+    }
+
+    private void CloseEditModal()
+    {
+        showEditModal = false;
+        editingProduct = new();
+        selectedImageFile = null;
+    }
+
+    private void OnImageFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedImageFile = e.File;
+    }
+
+    private async Task UploadImage()
+    {
+        if (selectedImageFile == null) return;
+
+        try
+        {
+            var formData = new MultipartFormDataContent();
+            var fileContent = new StreamContent(selectedImageFile.OpenReadStream());
+            formData.Add(fileContent, "file", selectedImageFile.Name);
+
+            var response = await Http.PostAsync("api/Recipe/UploadImage", formData);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<string>>();
+                if (result?.Data != null)
+                {
+                    editingProduct.ImageUrl = result.Data;
+                    StateHasChanged(); // UI'ı güncelle
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Image upload error: {ex.Message}");
+        }
+    }
+
+    private void AddIngredient()
+    {
+        editingProduct.Ingredients.Add(new RecipeBookProject.Contracts.Recipes.RecipeIngredientDto());
+    }
+
+    private void RemoveIngredient(int index)
+    {
+        if (index >= 0 && index < editingProduct.Ingredients.Count)
+        {
+            editingProduct.Ingredients.RemoveAt(index);
+        }
+    }
+
+    private async Task SaveEditedProduct()
+    {
+        if (isSaving) return;
+        isSaving = true;
+
+        try
+        {
+            var updateDto = new UpdateProductDto
+            {
+                ProductId = editingProduct.ProductId,
+                ProductName = editingProduct.ProductName,
+                CategoryId = editingProduct.CategoryId,
+                ProductShortDesc = editingProduct.ProductShortDesc,
+                ImageUrl = editingProduct.ImageUrl,
+                ProductionTime = editingProduct.ProductionTime,
+                ProductDetailedText = editingProduct.ProductDetailedText,
+                BaseServingSize = editingProduct.BaseServingSize,
+                Ingredients = editingProduct.Ingredients.Where(i => i.IngredientId > 0).ToList()
+            };
+
+            var result = await AdminSvc.UpdateProductAsync(editingProduct.ProductId, updateDto);
+            if (result)
+            {
+                CloseEditModal();
+                await Load();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating product: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
 }

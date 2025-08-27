@@ -1,6 +1,11 @@
 ﻿@page "/recipe"
 @using RecipeBookProject.Client.Shared
+@using RecipeBookProject.Contracts.Recipes
+@using Microsoft.AspNetCore.Components.Forms
+@using RecipeBookProject.Client.Models
 @inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
 
 <PageTitle>Tarifler</PageTitle>
 
@@ -30,7 +35,7 @@
 @if (showAddModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Yeni Tarif Ekle</h5>
@@ -76,21 +81,112 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Görsel URL</label>
-                                <InputText class="form-control" @bind-Value="newRecipe.ImageUrl" />
+                                <label class="form-label">Kaç Kişilik</label>
+                                <InputNumber class="form-control" @bind-Value="newRecipe.BaseServingSize" min="1" max="20" />
+                                <ValidationMessage For="@(() => newRecipe.BaseServingSize)" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Tarif Görseli</label>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <InputFile class="form-control" OnChange="OnImageFileSelected" accept="image/*" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="UploadImage" disabled="@(selectedImageFile == null)">
+                                        <i class="bi bi-upload"></i> Yükle
+                                    </button>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(newRecipe.ImageUrl))
+                                {
+                                    <div class="mt-2">
+                                        <img src="@newRecipe.ImageUrl" alt="Önizleme" class="img-fluid rounded" style="max-height: 200px;" 
+                                             @onerror="() => OnImageError(newRecipe.ImageUrl)" 
+                                             @onload="() => OnImageLoad(newRecipe.ImageUrl)" />
+                                        <div class="mt-1">
+                                            <small class="text-muted">URL: @newRecipe.ImageUrl</small>
+                                        </div>
+                                    </div>
+                                }
                             </div>
 
                             <div class="col-12">
                                 <label class="form-label">Tarif İçeriği</label>
-                                <InputTextArea class="form-control" @bind-Value="newRecipe.Description" rows="6" />
+                                <div class="border rounded p-2">
+                                    <div class="d-flex gap-1 mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='() => FormatText("bold")'>
+                                            <i class="bi bi-type-bold"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='() => FormatText("italic")'>
+                                            <i class="bi bi-type-italic"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='() => FormatText("underline")'>
+                                            <i class="bi bi-type-underline"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='() => FormatText("insertUnorderedList")'>
+                                            <i class="bi bi-list-ul"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='() => FormatText("insertOrderedList")'>
+                                            <i class="bi bi-list-ol"></i>
+                                        </button>
+                                    </div>
+                                    <div class="border rounded p-2" contenteditable="true" @ref="richTextEditor" @onblur="OnRichTextBlur">
+                                        @newRecipe.Description
+                                    </div>
+                                    <ValidationMessage For="@(() => newRecipe.Description)" />
+                                </div>
                             </div>
 
-                            @if (!string.IsNullOrWhiteSpace(newRecipe.ImageUrl))
-                            {
-                                <div class="col-12">
-                                    <img src="@newRecipe.ImageUrl" alt="Önizleme" class="img-fluid rounded" />
+                            <!-- Malzemeler Bölümü -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-0">Malzemeler</h6>
+                                            <small class="text-muted">En az bir malzeme eklemelisiniz</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-primary" @onclick="AddIngredient">
+                                            <i class="bi bi-plus"></i> Malzeme Ekle
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (newRecipe.Ingredients.Count == 0)
+                                        {
+                                            <p class="text-muted text-center">Henüz malzeme eklenmemiş.</p>
+                                        }
+                                        else
+                                        {
+                                            @for (int i = 0; i < newRecipe.Ingredients.Count; i++)
+                                            {
+                                                var ingredient = newRecipe.Ingredients[i];
+                                                var index = i;
+                                                <div class="row g-2 mb-2 align-items-center">
+                                                    <div class="col-md-4">
+                                                        <InputSelect class="form-select" @bind-Value="ingredient.IngredientId" @onchange="() => OnIngredientChanged(index)">
+                                                            <option value="0">Malzeme Seçin</option>
+                                                            @foreach (var ing in availableIngredients)
+                                                            {
+                                                                <option value="@ing.IngredientId">@ing.Name</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <InputNumber class="form-control" @bind-Value="ingredient.Quantity" min="0" step="0.1" />
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <InputText class="form-control" @bind-Value="ingredient.Unit" placeholder="Birim" />
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <InputText class="form-control" @bind-Value="ingredient.Notes" placeholder="Not (opsiyonel)" />
+                                                    </div>
+                                                    <div class="col-md-1">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveIngredient(index)">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
                                 </div>
-                            }
+                            </div>
                         </div>
                     </div>
 
@@ -110,6 +206,8 @@
     private List<ProductDto>? liste;
     private List<List<ProductSlider.ProductCard>> allProductSlider = new();
     private List<CategoryDto>? categoryListe;
+    private List<IngredientDto> availableIngredients = new();
+    private string ApiBaseUrl => Configuration["ApiBaseUrl"] ?? "https://localhost:7129/";
 
     // Modal state
     private bool showAddModal = false;
@@ -118,19 +216,24 @@
     // Form modeli
     private NewRecipeModel newRecipe = new();
 
+    // File upload
+    private IBrowserFile? selectedImageFile;
+    private ElementReference richTextEditor;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+        await LoadIngredientsAsync();
     }
 
     private async Task LoadDataAsync()
     {
         // Kategoriler
-        var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
+                    var response2 = await Http.GetFromJsonAsync<ApiResponse<List<CategoryDto>>>("api/Recipe/GetAllCategories");
         categoryListe = response2?.Data ?? new List<CategoryDto>();
 
         // Ürünler
-        var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>("api/Recipe/getShortRecipes");
+                    var response = await Http.GetFromJsonAsync<ApiResponse<List<ProductDto>>>("api/Recipe/getShortRecipes");
         liste = response?.Data ?? new List<ProductDto>();
 
         // Slider veri hazırlığı
@@ -150,9 +253,21 @@
 
             if (catIndex.TryGetValue(catId.Value, out var idx))
             {
+                // Resim URL'ini absolute URL'e çevir
+                string absoluteImageUrl = item.ImageUrl ?? "";
+                if (!string.IsNullOrEmpty(absoluteImageUrl) && absoluteImageUrl.StartsWith("/"))
+                {
+                    absoluteImageUrl = ApiBaseUrl.TrimEnd('/') + absoluteImageUrl;
+                    Console.WriteLine($"DEBUG: LoadDataAsync - Converted image URL: {item.ImageUrl} -> {absoluteImageUrl}");
+                }
+                else
+                {
+                    Console.WriteLine($"DEBUG: LoadDataAsync - Image URL (no conversion needed): {absoluteImageUrl}");
+                }
+                
                 allProductSlider[idx].Add(new ProductSlider.ProductCard
                 {
-                    ImageUrl = item.ImageUrl,
+                    ImageUrl = absoluteImageUrl,
                     Title = item.ProductName,
                     ProductId = item.ProductId,
                     Description = item.ProductShortDesc,
@@ -163,15 +278,179 @@
         }
     }
 
+    private async Task LoadIngredientsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<List<IngredientDto>>>("api/Recipe/GetAllIngredients");
+            availableIngredients = response?.Data ?? new List<IngredientDto>();
+        }
+        catch
+        {
+            availableIngredients = new List<IngredientDto>();
+        }
+    }
+
     private void OpenAddModal()
     {
-        newRecipe = new(); // formu sıfırla
+        newRecipe = new NewRecipeModel
+        {
+            Description = "<p>Tarif detaylarını buraya yazın...</p>",
+            Ingredients = new List<RecipeIngredientDto>() // Ingredients listesini temizle
+        };
+        selectedImageFile = null;
         showAddModal = true;
     }
 
     private void CloseAddModal()
     {
         showAddModal = false;
+    }
+
+    private void OnImageFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedImageFile = e.File;
+    }
+
+    private async Task UploadImage()
+    {
+        if (selectedImageFile == null) return;
+
+        try
+        {
+            Console.WriteLine($"DEBUG: UploadImage - File: {selectedImageFile.Name}, Size: {selectedImageFile.Size} bytes");
+            
+            var formData = new MultipartFormDataContent();
+            var fileContent = new StreamContent(selectedImageFile.OpenReadStream());
+            formData.Add(fileContent, "file", selectedImageFile.Name);
+
+            Console.WriteLine($"DEBUG: UploadImage - Sending request to: api/Recipe/UploadImage");
+            
+            var response = await Http.PostAsync("api/Recipe/UploadImage", formData);
+            Console.WriteLine($"DEBUG: UploadImage - Response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<string>>();
+                Console.WriteLine($"DEBUG: UploadImage - Response data: {result?.Data}");
+                
+                if (result?.Data != null)
+                {
+                    // Relative URL'i absolute URL'e çevir
+                    var relativeUrl = result.Data;
+                    if (relativeUrl.StartsWith("/"))
+                    {
+                        newRecipe.ImageUrl = ApiBaseUrl.TrimEnd('/') + relativeUrl;
+                    }
+                    else
+                    {
+                        newRecipe.ImageUrl = relativeUrl;
+                    }
+                    
+                    Console.WriteLine($"DEBUG: UploadImage - Original URL: {result.Data}");
+                    Console.WriteLine($"DEBUG: UploadImage - Absolute URL: {newRecipe.ImageUrl}");
+                    
+                    // Resim URL'ini test et
+                    await TestImageUrl(newRecipe.ImageUrl);
+                    
+                    StateHasChanged(); // UI'ı güncelle
+                }
+                else
+                {
+                    Console.WriteLine("ERROR: UploadImage - Response data is null");
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"ERROR: UploadImage - Upload failed: {response.StatusCode} - {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: UploadImage - Exception: {ex.Message}");
+            Console.WriteLine($"ERROR: UploadImage - Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task FormatText(string command)
+    {
+        await JSRuntime.InvokeVoidAsync("document.execCommand", command, false, null);
+    }
+
+    private async Task OnRichTextBlur()
+    {
+        try
+        {
+            newRecipe.Description = await JSRuntime.InvokeAsync<string>("getElementInnerHtml", richTextEditor);
+        }
+        catch
+        {
+            // Element reference is not available
+        }
+    }
+
+
+
+    private async Task AddIngredient()
+    {
+        newRecipe.Ingredients.Add(new RecipeIngredientDto
+        {
+            IngredientId = 0,
+            IngredientName = null, // null olarak bırak, OnIngredientChanged'da doldurulacak
+            Quantity = 1,
+            Unit = "adet",
+            Notes = "",
+            BaseServingSize = newRecipe.BaseServingSize ?? 1
+        });
+        StateHasChanged(); // UI'ı güncelle
+        
+        // Kullanıcıya bilgi ver
+        await JSRuntime.InvokeVoidAsync("console.log", "Yeni malzeme satırı eklendi. Lütfen malzeme seçimi yapın.");
+    }
+
+    private void RemoveIngredient(int index)
+    {
+        if (index >= 0 && index < newRecipe.Ingredients.Count)
+        {
+            newRecipe.Ingredients.RemoveAt(index);
+            StateHasChanged(); // UI'ı güncelle
+        }
+    }
+
+    private void OnIngredientChanged(int index)
+    {
+        if (index >= 0 && index < newRecipe.Ingredients.Count)
+        {
+            var ingredient = newRecipe.Ingredients[index];
+            var selectedIngredient = availableIngredients.FirstOrDefault(i => i.IngredientId == ingredient.IngredientId);
+            if (selectedIngredient != null)
+            {
+                ingredient.IngredientName = selectedIngredient.Name;
+                ingredient.BaseServingSize = newRecipe.BaseServingSize ?? 1;
+                // Varsayılan birimi set et
+                if (string.IsNullOrWhiteSpace(ingredient.Unit))
+                {
+                    ingredient.Unit = selectedIngredient.DefaultUnit ?? "adet";
+                }
+                // Quantity 0 ise varsayılan değer ata
+                if (ingredient.Quantity <= 0)
+                {
+                    ingredient.Quantity = 1;
+                }
+                
+                // Debug log ekle
+                Console.WriteLine($"DEBUG: OnIngredientChanged - Ingredient {index}: ID={ingredient.IngredientId}, Name={ingredient.IngredientName}, Unit={ingredient.Unit}, Quantity={ingredient.Quantity}");
+                
+                StateHasChanged(); // UI'ı güncelle
+            }
+            else
+            {
+                // Eğer malzeme bulunamazsa, IngredientName'i temizle
+                ingredient.IngredientName = null;
+                Console.WriteLine($"DEBUG: OnIngredientChanged - No ingredient found for ID: {ingredient.IngredientId}, clearing IngredientName");
+            }
+        }
     }
 
     private async Task SaveRecipeAsync()
@@ -181,6 +460,54 @@
 
         try
         {
+            // Validation kontrolleri
+            Console.WriteLine($"DEBUG: SaveRecipeAsync - ImageUrl: {newRecipe.ImageUrl}");
+            if (string.IsNullOrWhiteSpace(newRecipe.ImageUrl))
+            {
+                Console.Error.WriteLine("DEBUG: ImageUrl is required");
+                await JSRuntime.InvokeVoidAsync("alert", "Lütfen önce bir resim yükleyin.");
+                return;
+            }
+
+            // Debug: Malzemeleri kontrol et
+            Console.WriteLine($"DEBUG: SaveRecipeAsync - Ingredients count: {newRecipe.Ingredients.Count}");
+            foreach (var ing in newRecipe.Ingredients)
+            {
+                Console.WriteLine($"DEBUG: Ingredient - ID: {ing.IngredientId}, Name: {ing.IngredientName}, Quantity: {ing.Quantity}, Unit: {ing.Unit}");
+            }
+
+            // IngredientName boş olan malzemeleri doldur
+            foreach (var ingredient in newRecipe.Ingredients.Where(i => i.IngredientId > 0))
+            {
+                if (string.IsNullOrWhiteSpace(ingredient.IngredientName))
+                {
+                    var availableIngredient = availableIngredients.FirstOrDefault(i => i.IngredientId == ingredient.IngredientId);
+                    if (availableIngredient != null)
+                    {
+                        ingredient.IngredientName = availableIngredient.Name;
+                        Console.WriteLine($"DEBUG: Filled missing IngredientName for ID {ingredient.IngredientId}: {ingredient.IngredientName}");
+                    }
+                }
+            }
+            
+            var filteredIngredients = newRecipe.Ingredients
+                .Where(i => i.IngredientId > 0 && !string.IsNullOrWhiteSpace(i.Unit))
+                .ToList();
+            Console.WriteLine($"DEBUG: Filtered ingredients count: {filteredIngredients.Count}");
+            foreach (var ing in filteredIngredients)
+            {
+                Console.WriteLine($"DEBUG: Filtered Ingredient - ID: {ing.IngredientId}, Name: {ing.IngredientName}, Quantity: {ing.Quantity}, Unit: {ing.Unit}");
+            }
+            
+            // Eğer hiç malzeme yoksa uyarı ver
+            if (filteredIngredients.Count == 0)
+            {
+                Console.Error.WriteLine("DEBUG: No valid ingredients found after filtering");
+                // Kullanıcıya uyarı göster - bu kısımda JavaScript alert kullanabiliriz
+                await JSRuntime.InvokeVoidAsync("alert", "Lütfen en az bir geçerli malzeme ekleyin. Malzeme seçimi, miktar ve birim alanları doldurulmalıdır.");
+                return;
+            }
+
             var payload = new CreateProductDto
             {
                 ProductName = newRecipe.ProductName!,
@@ -188,12 +515,22 @@
                 ProductShortDesc = newRecipe.ProductShortDesc!,
                 ProductionTime = newRecipe.ProductionTime ?? 0,
                 ImageUrl = newRecipe.ImageUrl!,
-                ProductDetailedText = newRecipe.Description!
+                ProductDetailedText = !string.IsNullOrWhiteSpace(newRecipe.Description) ? newRecipe.Description : "Tarif detayları girilmemiş",
+                BaseServingSize = newRecipe.BaseServingSize ?? 1,
+                Ingredients = filteredIngredients
             };
+
+            Console.WriteLine($"DEBUG: Sending payload with {payload.Ingredients.Count} ingredients");
+            Console.WriteLine($"DEBUG: Payload ImageUrl: {payload.ImageUrl}");
+            foreach (var ing in payload.Ingredients)
+            {
+                Console.WriteLine($"DEBUG: Payload Ingredient - ID: {ing.IngredientId}, Name: {ing.IngredientName}, Quantity: {ing.Quantity}, Unit: {ing.Unit}");
+            }
 
             var resp = await Http.PostAsJsonAsync("api/Recipe/createrecipe", payload);
             if (resp.IsSuccessStatusCode)
             {
+                Console.WriteLine("DEBUG: Recipe created successfully");
                 await LoadDataAsync();
                 showAddModal = false;
             }
@@ -205,11 +542,69 @@
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine(ex);
+            Console.Error.WriteLine($"DEBUG: Exception in SaveRecipeAsync: {ex}");
         }
         finally
         {
             isSaving = false;
+        }
+    }
+
+    private void OnImageError(string imageUrl)
+    {
+        Console.WriteLine($"ERROR: OnImageError - Image failed to load: {imageUrl}");
+        Console.WriteLine($"ERROR: OnImageError - Current base address: {Http.BaseAddress}");
+        Console.WriteLine($"ERROR: OnImageError - ApiBaseUrl: {ApiBaseUrl}");
+        
+        // Eğer relative URL ise, absolute URL'e çevir
+        if (imageUrl.StartsWith("/"))
+        {
+            var absoluteUrl = ApiBaseUrl.TrimEnd('/') + imageUrl;
+            Console.WriteLine($"ERROR: OnImageError - Full URL would be: {absoluteUrl}");
+        }
+    }
+
+    private void OnImageLoad(string imageUrl)
+    {
+        Console.WriteLine($"SUCCESS: OnImageLoad - Image loaded successfully: {imageUrl}");
+    }
+
+    private async Task TestImageUrl(string imageUrl)
+    {
+        try
+        {
+            Console.WriteLine($"DEBUG: TestImageUrl - Testing URL: {imageUrl}");
+            
+            // Eğer relative URL ise, absolute URL'e çevir
+            string testUrl = imageUrl;
+            if (imageUrl.StartsWith("/"))
+            {
+                testUrl = ApiBaseUrl.TrimEnd('/') + imageUrl;
+                Console.WriteLine($"DEBUG: TestImageUrl - Converted to absolute URL: {testUrl}");
+            }
+            
+            // Resim URL'ini test et
+            var response = await Http.GetAsync(testUrl);
+            Console.WriteLine($"DEBUG: TestImageUrl - Response status: {response.StatusCode}");
+            Console.WriteLine($"DEBUG: TestImageUrl - Response headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join("; ", h.Value)}"))}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"DEBUG: TestImageUrl - Image accessible successfully");
+                var contentLength = response.Content.Headers.ContentLength;
+                var contentType = response.Content.Headers.ContentType;
+                Console.WriteLine($"DEBUG: TestImageUrl - Content-Length: {contentLength}, Content-Type: {contentType}");
+            }
+            else
+            {
+                Console.WriteLine($"ERROR: TestImageUrl - Image not accessible: {response.StatusCode}");
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"ERROR: TestImageUrl - Response content: {content}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: TestImageUrl - Exception: {ex.Message}");
         }
     }
 
@@ -226,11 +621,18 @@
         [System.ComponentModel.DataAnnotations.Range(0, 1440, ErrorMessage = "0-1440 arası olmalıdır.")]
         public int? ProductionTime { get; set; }
 
+        [System.ComponentModel.DataAnnotations.Range(1, 20, ErrorMessage = "1-20 kişi arası olmalıdır.")]
+        public int? BaseServingSize { get; set; } = 1;
+
         public string? ProductShortDesc { get; set; }
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Resim yüklemek zorunludur.")]
         public string? ImageUrl { get; set; }
 
         // Uzun açıklama / içerik
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Tarif içeriği zorunludur.")]
         public string? Description { get; set; }
-    }
 
+        // Malzemeler
+        public List<RecipeIngredientDto> Ingredients { get; set; } = new List<RecipeIngredientDto>();
+    }
 }

@@ -38,6 +38,7 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
         public async Task<List<Product>> GetAllShortRecipeRepositoryAsync()
         {
             return await _context.Products
+                .Where(p => p.IsVisible) // Sadece görünür tarifleri getir
                 .Include(p => p.Category)
                 .Include(p => p.FeaturedCategory)
                 .Select(p => new Product
@@ -66,6 +67,7 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
         public async Task<Product?> GetDetailedRecipeRepository(int productId)
         {
             return await _context.Products
+                .Where(p => p.IsVisible) // Sadece görünür tarifleri getir
                 .Include(p => p.Category)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
         }
@@ -87,6 +89,7 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
         public Task<List<Product>> GetSearchedProductsRepository(string query, int? categoryid)
         {
             return _context.Products
+                .Where(p => p.IsVisible) // Sadece görünür tarifleri getir
                 .Include(p => p.Category)
                 .Include(p => p.FeaturedCategory)
                 .Where(p =>
@@ -278,12 +281,134 @@ namespace RecipeBookProject.DataAccess.Repositories.Concrete
             return affected > 0;
         }
 
-        public async Task<bool> CreateRecipeRepositoryAsync(int userId, PendingProduct product)
+        public async Task<int> CreateRecipeRepositoryAsync(int userId, PendingProduct product)
         {
+            // Debug: ImageUrl kontrolü
+            Console.WriteLine($"DEBUG: CreateRecipeRepositoryAsync - Product ImageUrl: {product.ImageUrl}");
+            Console.WriteLine($"DEBUG: CreateRecipeRepositoryAsync - Product ImageUrl length: {product.ImageUrl?.Length}");
+            Console.WriteLine($"DEBUG: CreateRecipeRepositoryAsync - Product ImageUrl contains extension: {product.ImageUrl?.Contains(".")}");
+            
             await _context.PendingProducts.AddAsync(product);
             var affected = await _context.SaveChangesAsync();
 
-            return affected > 0;
+            if (affected > 0)
+            {
+                Console.WriteLine($"DEBUG: CreateRecipeRepositoryAsync - Successfully saved with ID: {product.ProductId}");
+                Console.WriteLine($"DEBUG: CreateRecipeRepositoryAsync - Saved ImageUrl: {product.ImageUrl}");
+                return product.ProductId; // Kaydedilen PendingProduct'ın ID'sini döndür
+            }
+            
+            Console.WriteLine($"ERROR: CreateRecipeRepositoryAsync - Failed to save product");
+            return 0; // Kaydetme başarısız
+        }
+
+        public async Task<Product?> GetByIdAsync(int productId, CancellationToken ct)
+        {
+            return await _context.Products
+                .Include(p => p.Category)
+                .FirstOrDefaultAsync(p => p.ProductId == productId, ct);
+        }
+
+        public async Task<List<RecipeIngredient>> GetRecipeIngredientsRepositoryAsync(int productId, CancellationToken ct = default)
+        {
+            try
+            {
+                // Null check ekle
+                if (productId <= 0)
+                {
+                    Console.WriteLine($"DEBUG: GetRecipeIngredientsRepositoryAsync - Invalid productId: {productId}");
+                    return new List<RecipeIngredient>();
+                }
+
+                Console.WriteLine($"DEBUG: GetRecipeIngredientsRepositoryAsync - Searching for productId: {productId}");
+                
+                var result = await _context.RecipeIngredients
+                    .Include(ri => ri.Ingredient)
+                    .Where(ri => ri.ProductId == productId)  // ProductId null olabilir
+                    .ToListAsync(ct);
+                
+                Console.WriteLine($"DEBUG: GetRecipeIngredientsRepositoryAsync - Found {result.Count} ingredients");
+                
+                // Her malzeme için null check yap
+                foreach (var ri in result)
+                {
+                    if (ri.Ingredient == null)
+                    {
+                        Console.WriteLine($"DEBUG: GetRecipeIngredientsRepositoryAsync - Ingredient is null for RecipeIngredientId: {ri.RecipeIngredientId}");
+                    }
+                }
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: GetRecipeIngredientsRepositoryAsync - Exception: {ex.Message}");
+                Console.WriteLine($"ERROR: Stack trace: {ex.StackTrace}");
+                return new List<RecipeIngredient>();
+            }
+        }
+        
+        public async Task<List<RecipeIngredient>> GetPendingRecipeIngredientsRepositoryAsync(int pendingProductId, CancellationToken ct = default)
+        {
+            try
+            {
+                // Null check ekle
+                if (pendingProductId <= 0)
+                {
+                    Console.WriteLine($"DEBUG: GetPendingRecipeIngredientsRepositoryAsync - Invalid pendingProductId: {pendingProductId}");
+                    return new List<RecipeIngredient>();
+                }
+
+                Console.WriteLine($"DEBUG: GetPendingRecipeIngredientsRepositoryAsync - Searching for pendingProductId: {pendingProductId}");
+                
+                var result = await _context.RecipeIngredients
+                    .Include(ri => ri.Ingredient)
+                    .Where(ri => ri.PendingProductId == pendingProductId)
+                    .ToListAsync(ct);
+                
+                Console.WriteLine($"DEBUG: GetPendingRecipeIngredientsRepositoryAsync - Found {result.Count} ingredients");
+                
+                // Her malzeme için null check yap
+                foreach (var ri in result)
+                {
+                    if (ri.Ingredient == null)
+                    {
+                        Console.WriteLine($"DEBUG: GetPendingRecipeIngredientsRepositoryAsync - Ingredient is null for RecipeIngredientId: {ri.RecipeIngredientId}");
+                    }
+                }
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: GetPendingRecipeIngredientsRepositoryAsync - Exception: {ex.Message}");
+                Console.WriteLine($"ERROR: Stack trace: {ex.StackTrace}");
+                return new List<RecipeIngredient>();
+            }
+        }
+        
+        public async Task<bool> SaveRecipeIngredientsAsync(List<RecipeIngredient> recipeIngredients)
+        {
+            try
+            {
+                Console.WriteLine($"DEBUG: SaveRecipeIngredientsAsync called with {recipeIngredients.Count} ingredients");
+                foreach (var ri in recipeIngredients)
+                {
+                    Console.WriteLine($"DEBUG: RecipeIngredient - PendingProductId: {ri.PendingProductId}, IngredientId: {ri.IngredientId}, Quantity: {ri.Quantity}");
+                }
+                
+                await _context.RecipeIngredients.AddRangeAsync(recipeIngredients);
+                var affected = await _context.SaveChangesAsync();
+                
+                Console.WriteLine($"DEBUG: SaveRecipeIngredientsAsync saved {affected} records");
+                return affected > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving recipe ingredients: {ex.Message}");
+                Console.WriteLine($"Error details: {ex}");
+                return false;
+            }
         }
     }
 }

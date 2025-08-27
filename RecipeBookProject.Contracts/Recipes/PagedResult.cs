@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RecipeBookProject.Business.Models
+namespace RecipeBookProject.Contracts.Recipes
 {
     public class PagedResult<T>
     {

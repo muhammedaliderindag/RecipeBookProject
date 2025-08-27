@@ -25,6 +25,10 @@ namespace RecipeBookProject.DataAccess.Repositories.Abstract
        Task<bool> AddCommentsRepositoryAsync(int productid, int userid, bool isSecret,string comment);
        Task<bool> SaveAbuseRepositoryAsync(int userid, int ProductId, int AbuseCategoryId, string Description);
        Task<List<AbuseCategory>> GetAbuseCategoryRepositoryAsync();
-        Task<bool> CreateRecipeRepositoryAsync(int userId,PendingProduct product);
+        Task<int> CreateRecipeRepositoryAsync(int userId,PendingProduct product);
+        Task<Product?> GetByIdAsync(int productId, CancellationToken ct);
+        Task<List<RecipeIngredient>> GetRecipeIngredientsRepositoryAsync(int productId, CancellationToken ct = default);
+        Task<List<RecipeIngredient>> GetPendingRecipeIngredientsRepositoryAsync(int pendingProductId, CancellationToken ct = default);
+        Task<bool> SaveRecipeIngredientsAsync(List<RecipeIngredient> recipeIngredients);
     }
 }

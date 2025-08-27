@@ -1,6 +1,8 @@
 ﻿
 using RecipeBookProject.Business.Abstract;
 using RecipeBookProject.Business.Models;
+using RecipeBookProject.Contracts;
+using RecipeBookProject.Contracts;
 using RecipeBookProject.Data.Entities;
 using RecipeBookProject.DataAccess.Repositories.Abstract;
 

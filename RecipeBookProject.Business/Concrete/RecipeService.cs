@@ -3,6 +3,8 @@ using Azure;
 using Microsoft.EntityFrameworkCore;
 using RecipeBookProject.Business.Abstract;
 using RecipeBookProject.Business.Models;
+using RecipeBookProject.Contracts;
+using RecipeBookProject.Contracts.Recipes;
 using RecipeBookProject.Data.Entities;
 using RecipeBookProject.DataAccess.Repositories.Abstract;
 using System;
@@ -40,6 +42,34 @@ public class RecipeService : IRecipeService
         if (response == null)
             throw new Exception("Veriler çekilemedi");
 
+        // Malzemeleri de getir
+        var ingredients = await _recipeRepository.GetRecipeIngredientsRepositoryAsync(productId, CancellationToken.None);
+        var ingredientDtos = new List<RecipeIngredientDto>();
+        
+        if (ingredients != null && ingredients.Any())
+        {
+            foreach (var ri in ingredients)
+            {
+                if (ri.Ingredient != null)
+                {
+                    ingredientDtos.Add(new RecipeIngredientDto
+                    {
+                        RecipeIngredientId = ri.RecipeIngredientId,
+                        IngredientId = ri.IngredientId,
+                        IngredientName = ri.Ingredient.Name,
+                        Quantity = ri.Quantity,
+                        Unit = ri.Unit,
+                        Notes = ri.Notes,
+                        BaseServingSize = response.BaseServingSize // Her malzeme için tarifin BaseServingSize'ını kullan
+                    });
+                }
+                else
+                {
+                    Console.WriteLine($"WARNING: GetDetailedRecipeAsync - Ingredient is null for RecipeIngredientId: {ri.RecipeIngredientId}");
+                }
+            }
+        }
+
         var dto = new ProductDto
         {
             ProductId = response.ProductId,
@@ -49,6 +79,8 @@ public class RecipeService : IRecipeService
             CategoryId = response.CategoryId,
             ImageUrl = response.ImageUrl,
             ProductionTime = response.ProductionTime,
+            BaseServingSize = response.BaseServingSize,
+            Ingredients = ingredientDtos,
             FeaturedCategory = response.FeaturedCategory == null ? null : new FeaturedCategoryDto
             {
                 FeaturedCategoryId = response.FeaturedCategory.FeaturedCategoryId,
@@ -59,7 +91,6 @@ public class RecipeService : IRecipeService
                 CategoryId = response.Category.CategoryId,
                 CategoryName = response.Category.CategoryName
             }
-
         };
 
         return GeneralResponse<ProductDto>.Success(dto, "Veriler başarıyla çekildi", 200);
@@ -154,10 +185,10 @@ public class RecipeService : IRecipeService
     public async Task<GeneralResponse<List<ProductDto>>> GetShortRecipesAsync()
     {
         var recipes = await _recipeRepository.GetAllShortRecipeRepositoryAsync();
-        if (recipes == null || !recipes.Any())
-        {
-            throw new Exception("Veriler çekilemedi");
-        }
+        //if (recipes == null || !recipes.Any())
+        //{
+        //    throw new Exception("Veriler çekilemedi");
+        //}
         var recipesDto = recipes.Select(p => new ProductDto
         {
             ProductId = p.ProductId,
@@ -270,6 +301,21 @@ public class RecipeService : IRecipeService
 
     public async Task<GeneralResponse<NoData>> CreateRecipeAsync(int userid, CreateProductDto request)
     {
+        // Debug: Malzemeleri kontrol et
+        Console.WriteLine($"DEBUG: CreateRecipeAsync called with {request.Ingredients?.Count ?? 0} ingredients");
+        if (request.Ingredients != null && request.Ingredients.Any())
+        {
+            foreach (var ing in request.Ingredients)
+            {
+                Console.WriteLine($"DEBUG: Ingredient - ID: {ing.IngredientId}, Quantity: {ing.Quantity}, Unit: {ing.Unit}");
+            }
+        }
+
+        // Debug: ImageUrl kontrolü
+        Console.WriteLine($"DEBUG: CreateRecipeAsync - Request ImageUrl: {request.ImageUrl}");
+        Console.WriteLine($"DEBUG: CreateRecipeAsync - Request ImageUrl length: {request.ImageUrl?.Length}");
+        Console.WriteLine($"DEBUG: CreateRecipeAsync - Request ImageUrl contains extension: {request.ImageUrl?.Contains(".")}");
+        
         var PendingProductDto = new PendingProduct
         {
             ProductName = request.ProductName,
@@ -278,16 +324,99 @@ public class RecipeService : IRecipeService
             ImageUrl = request.ImageUrl,
             ProductionTime = request.ProductionTime ?? 0,
             ProductDetailedText = request.ProductDetailedText,
+            BaseServingSize = request.BaseServingSize,
             CreatedAt = DateTime.UtcNow,
             UserId = userid,
             IsApproved = false,
             ApprovedAt = null
         };
-        var response = await _recipeRepository.CreateRecipeRepositoryAsync(userid, PendingProductDto);
-        if (!response)
+        
+        Console.WriteLine($"DEBUG: CreateRecipeAsync - PendingProduct ImageUrl: {PendingProductDto.ImageUrl}");
+        Console.WriteLine($"DEBUG: CreateRecipeAsync - PendingProduct ImageUrl length: {PendingProductDto.ImageUrl?.Length}");
+        
+        var pendingProductId = await _recipeRepository.CreateRecipeRepositoryAsync(userid, PendingProductDto);
+        if (pendingProductId == 0)
         {
             throw new Exception("Kaydetme başarısız oldu.");
         }
+        
+        Console.WriteLine($"DEBUG: PendingProduct created with ID: {pendingProductId}");
+        
+        // Malzemeleri kaydet - PendingProduct ID'si artık mevcut
+        if (request.Ingredients != null && request.Ingredients.Any())
+        {
+            var recipeIngredients = request.Ingredients.Select(ing => new RecipeIngredient
+            {
+                ProductId = null, // Onaylanmamış tarif için NULL
+                PendingProductId = pendingProductId, // Veritabanından dönen ID
+                IngredientId = ing.IngredientId,
+                Quantity = ing.Quantity,
+                Unit = ing.Unit,
+                Notes = ing.Notes,
+                ServingSize = request.BaseServingSize
+            }).ToList();
+            
+            Console.WriteLine($"DEBUG: Attempting to save {recipeIngredients.Count} recipe ingredients");
+            
+            var ingredientsSaved = await _recipeRepository.SaveRecipeIngredientsAsync(recipeIngredients);
+            if (!ingredientsSaved)
+            {
+                throw new Exception("Malzemeler kaydedilemedi.");
+            }
+            
+            Console.WriteLine($"DEBUG: Recipe ingredients saved successfully");
+        }
+        else
+        {
+            Console.WriteLine($"DEBUG: No ingredients to save");
+        }
+        
         return GeneralResponse<NoData>.Success("Başarıyla kaydedildi", 201);
+    }
+
+    public async Task<ProductWithIngredientsDto?> GetRecipeWithIngredientsAsync(int productId, CancellationToken ct = default)
+    {
+        var product = await _recipeRepository.GetByIdAsync(productId, ct);
+        if (product == null) return null;
+
+        var ingredients = await _recipeRepository.GetRecipeIngredientsRepositoryAsync(productId, ct);
+
+        var ingredientDtos = new List<RecipeIngredientDto>();
+        
+        if (ingredients != null && ingredients.Any())
+        {
+            foreach (var ri in ingredients)
+            {
+                if (ri.Ingredient != null)
+                {
+                    ingredientDtos.Add(new RecipeIngredientDto
+                    {
+                        IngredientId = ri.IngredientId,
+                        Quantity = ri.Quantity,
+                        Unit = ri.Unit,
+                        Notes = ri.Notes
+                    });
+                }
+                else
+                {
+                    Console.WriteLine($"WARNING: GetRecipeWithIngredientsAsync - Ingredient is null for RecipeIngredientId: {ri.RecipeIngredientId}");
+                }
+            }
+        }
+
+        return new ProductWithIngredientsDto
+        {
+            ProductId = product.ProductId,
+            ProductName = product.ProductName,
+            ProductShortDesc = product.ProductShortDesc,
+            ProductDetailedText = product.ProductDetailedText,
+            CategoryId = product.CategoryId,
+            ImageUrl = product.ImageUrl,
+            ProductionTime = product.ProductionTime,
+            CreatedAt = product.CreatedAt,
+            BaseServingSize = 1,
+            Ingredients = ingredientDtos,
+            CategoryName = product.Category.CategoryName
+        };
     }
 }

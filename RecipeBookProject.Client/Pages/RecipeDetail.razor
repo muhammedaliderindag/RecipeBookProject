@@ -3,9 +3,11 @@
 @inject AuthenticationStateProvider Auth
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components
 @using System.Security.Claims
 @using System.Globalization
-@using RecipeBookProject.Contracts.Common
+@using RecipeBookProject.Contracts.Recipes
+@using RecipeBookProject.Client.Models
 @if (!string.IsNullOrEmpty(_errorMessage))
 {
     <div class="alert alert-danger">@_errorMessage</div>
@@ -61,7 +63,7 @@ else if (product is not null)
                                 </div>
                             </div>
 
-                            <p class="text-body mt-3 mb-4">@product.ProductDetailedText</p>
+                            <div class="text-body mt-3 mb-4">@((MarkupString)product.ProductDetailedText)</div>
                         </div>
 
                         <!-- ALT: PUANLAMA, flex ile alta itiliyor -->
@@ -94,6 +96,161 @@ else if (product is not null)
 
             </div>
         </div>
+
+        <!-- === MALZEMELER === -->
+        @if (product != null)
+        {
+            <div class="card mb-4">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <i class="bi bi-list-check me-2"></i>
+                        Malzemeler 
+                        @if (product.Ingredients?.Count > 0)
+                        {
+                            <span class="text-muted">(@product.Ingredients.Count malzeme)</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">(Malzeme bulunamadı)</span>
+                        }
+                        <div class="mt-1">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Porsiyon sayısını değiştirerek malzeme miktarlarını otomatik hesaplayabilirsiniz
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Porsiyon Seçici -->
+                    <div class="d-flex align-items-center gap-3">
+                        <small class="text-muted">Porsiyon:</small>
+                        
+                        <!-- Hızlı Porsiyon Seçenekleri -->
+                        <div class="d-flex gap-1 me-2">
+                            @foreach (var quickSize in new[] { 1, 2, 4, 6, 8, 10 })
+                            {
+                                var isActive = selectedServingSize == quickSize;
+                                <button type="button" 
+                                        class="btn btn-sm @(isActive ? "btn-primary" : "btn-outline-secondary")"
+                                        @onclick="() => SetQuickServingSize(quickSize)"
+                                        title="@quickSize kişilik">
+                                    @quickSize
+                                </button>
+                            }
+                        </div>
+                        
+                        <div class="input-group" style="width: 180px;">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeServingSize(-1)" disabled="@(selectedServingSize <= 1)">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <InputNumber class="form-control form-control-sm text-center" @bind-Value="selectedServingSize" min="1" max="50" @onchange="OnServingSizeChanged" />
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeServingSize(1)" disabled="@(selectedServingSize >= 50)">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <span class="input-group-text">kişi</span>
+                        </div>
+                        <small class="text-muted">Orijinal: @(product.BaseServingSize) kişilik</small>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    @if (product.Ingredients?.Count > 0)
+                    {
+                        <div class="row">
+                            @foreach (var ingredient in product.Ingredients)
+                            {
+                                var scaledQuantity = CalculateScaledQuantity(ingredient.Quantity, product.BaseServingSize, selectedServingSize);
+                                var isScaled = selectedServingSize != product.BaseServingSize;
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="ingredient-card p-3 border rounded h-100 @(isScaled ? "scaled-ingredient" : "")" 
+                                         style="transition: all 0.3s ease; @(isScaled ? "border-color: #28a745 !important; background-color: #f8fff9;" : "")">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="mb-0 fw-semibold text-primary">@ingredient.IngredientName</h6>
+                                            <div class="text-end">
+                                                <span class="badge @(isScaled ? "bg-success" : "bg-primary") rounded-pill fs-6">
+                                                    @scaledQuantity.ToString("0.##") @ingredient.Unit
+                                                </span>
+                                                @if (isScaled)
+                                                {
+                                                    <div class="mt-1">
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-arrow-up-right text-success"></i>
+                                                            Orijinal: @ingredient.Quantity @ingredient.Unit
+                                                        </small>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(ingredient.Notes))
+                                        {
+                                            <small class="text-muted d-block">
+                                                <i class="bi bi-info-circle me-1"></i>
+                                                @ingredient.Notes
+                                            </small>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-muted">Malzeme Bulunamadı</h5>
+                            <p class="text-muted">Bu tarif için henüz malzeme eklenmemiş.</p>
+                        </div>
+                    }
+
+                    <!-- Porsiyon Özeti -->
+                    <div class="mt-4 p-4 bg-gradient-light rounded border">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="fw-bold text-primary fs-4">@product.BaseServingSize</div>
+                                <small class="text-muted">
+                                    <i class="bi bi-people me-1"></i>
+                                    Orijinal Porsiyon
+                                </small>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-bold text-success fs-4">@selectedServingSize</div>
+                                <small class="text-muted">
+                                    <i class="bi bi-person-check me-1"></i>
+                                    Seçilen Porsiyon
+                                </small>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-bold text-info fs-4">@(GetScalingFactor(product.BaseServingSize, selectedServingSize).ToString("0.##"))x</div>
+                                <small class="text-muted">
+                                    <i class="bi bi-calculator me-1"></i>
+                                    Çarpan
+                                </small>
+                            </div>
+                        </div>
+                        
+                        @if (selectedServingSize != product.BaseServingSize)
+                        {
+                            <div class="mt-3 pt-3 border-top text-center">
+                                @if (product.Ingredients?.Count > 0)
+                                {
+                                    <div class="alert alert-info mb-0 py-2">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>@selectedServingSize kişilik</strong> için malzeme miktarları otomatik olarak hesaplandı
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-warning mb-0 py-2">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>@selectedServingSize kişilik</strong> için porsiyon ayarlandı (malzeme bulunamadı)
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
 
         <!-- === YORUMLAR === -->
         <div class="card">
@@ -312,6 +469,9 @@ else if (product is not null)
     private ReportVm report = new();
     private List<AbuseCategoryDto> abuseCategories = new();
     ClaimsPrincipal? usera;
+
+    // Malzemeler ve Porsiyon
+    private int selectedServingSize = 1;
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
@@ -329,6 +489,7 @@ else if (product is not null)
             else
             {
                 product = detail.Data;
+                selectedServingSize = product.BaseServingSize; // Porsiyon sayısını başlat
                 await LoadCommentsAsync(1);
                 await LoadSavedRecipe();
                 await LoadVotedRecipe();
@@ -406,6 +567,49 @@ else if (product is not null)
         var ci = new CultureInfo("tr-TR");
         var ch = s.Trim()[0];
         return char.ToUpper(ch, ci).ToString();
+    }
+
+    // Malzeme hesaplama metodları
+    private decimal CalculateScaledQuantity(decimal originalQuantity, int originalServingSize, int newServingSize)
+    {
+        if (originalServingSize <= 0) return originalQuantity;
+        
+        var scalingFactor = (decimal)newServingSize / originalServingSize;
+        return originalQuantity * scalingFactor;
+    }
+
+    private decimal GetScalingFactor(int originalServingSize, int newServingSize)
+    {
+        if (originalServingSize <= 0) return 1;
+        return (decimal)newServingSize / originalServingSize;
+    }
+
+    private void OnServingSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newSize) && newSize > 0)
+        {
+            selectedServingSize = newSize;
+            StateHasChanged(); // UI'ı güncelle
+        }
+    }
+
+    private void ChangeServingSize(int delta)
+    {
+        var newSize = selectedServingSize + delta;
+        if (newSize >= 1 && newSize <= 50)
+        {
+            selectedServingSize = newSize;
+            StateHasChanged(); // UI'ı güncelle
+        }
+    }
+
+    private void SetQuickServingSize(int size)
+    {
+        if (size >= 1 && size <= 50)
+        {
+            selectedServingSize = size;
+            StateHasChanged(); // UI'ı güncelle
+        }
     }
 
     private async Task LoadCommentsAsync(int page)
@@ -528,8 +732,7 @@ else if (product is not null)
 
         await LoadCommentsAsync(1);
     }
-    public record ProductDto(int Id, string ProductName, string ImageUrl, string ProductDetailedText,
-    double RatingAvg, int RatingCount, int? YourRating, bool IsSavedByYou, int CommentsCount);
+
     private async Task SubmitReport()
     {
         if (report.Reason is null)
@@ -622,5 +825,75 @@ else if (product is not null)
 
     .bg-success-subtle {
         background-color: rgba(25,135,84,.15);
+    }
+
+    .ingredient-card {
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 1px solid #e9ecef !important;
+    }
+
+    .ingredient-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-color: #007bff !important;
+    }
+
+    .ingredient-card .badge {
+        font-size: 0.875rem !important;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .scaled-ingredient {
+        border-color: #28a745 !important;
+        background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
+    }
+
+    .scaled-ingredient:hover {
+        border-color: #20c997 !important;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.15);
+    }
+
+    .input-group .form-control {
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .input-group .btn {
+        border-radius: 0;
+    }
+
+    .input-group .btn:first-child {
+        border-top-left-radius: 0.375rem;
+        border-bottom-left-radius: 0.375rem;
+    }
+
+    .input-group .btn:last-child {
+        border-top-right-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+
+    /* Hızlı porsiyon butonları */
+    .btn-sm {
+        min-width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+
+    /* Malzeme kartları için ek stiller */
+    .ingredient-card .badge {
+        transition: all 0.3s ease;
+    }
+
+    .ingredient-card:hover .badge {
+        transform: scale(1.05);
+    }
+
+    /* Porsiyon özeti için gradient */
+    .bg-gradient-light {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     }
 </style>

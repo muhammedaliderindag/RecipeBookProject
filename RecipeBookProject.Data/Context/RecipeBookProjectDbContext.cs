@@ -20,6 +20,8 @@ public partial class RecipeBookProjectDbContext : DbContext
 
     public virtual DbSet<FeaturedCategory> FeaturedCategories { get; set; }
 
+    public virtual DbSet<Ingredient> Ingredients { get; set; }
+
     public virtual DbSet<PendingProduct> PendingProducts { get; set; }
 
     public virtual DbSet<Product> Products { get; set; }
@@ -27,6 +29,8 @@ public partial class RecipeBookProjectDbContext : DbContext
     public virtual DbSet<ProductAbuse> ProductAbuses { get; set; }
 
     public virtual DbSet<ProductVote> ProductVotes { get; set; }
+
+    public virtual DbSet<RecipeIngredient> RecipeIngredients { get; set; }
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
@@ -47,8 +51,15 @@ public partial class RecipeBookProjectDbContext : DbContext
                 .HasConstraintName("FK_Comments_Users");
         });
 
+        modelBuilder.Entity<Ingredient>(entity =>
+        {
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
         modelBuilder.Entity<PendingProduct>(entity =>
         {
+            entity.Property(e => e.BaseServingSize).HasDefaultValue(1);
+
             entity.HasOne(d => d.Category).WithMany(p => p.PendingProducts)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PendingProducts_Categories");
@@ -60,6 +71,9 @@ public partial class RecipeBookProjectDbContext : DbContext
 
         modelBuilder.Entity<Product>(entity =>
         {
+            entity.Property(e => e.BaseServingSize).HasDefaultValue(1);
+            entity.Property(e => e.FeaturedCategoryId).HasDefaultValue(2);
+
             entity.HasOne(d => d.Category).WithMany(p => p.Products)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Products_Categories");
@@ -91,6 +105,21 @@ public partial class RecipeBookProjectDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.ProductVotes)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ProductVotes_Users");
+        });
+
+        modelBuilder.Entity<RecipeIngredient>(entity =>
+        {
+            entity.Property(e => e.ServingSize).HasDefaultValue(1);
+
+            entity.HasOne(d => d.Ingredient).WithMany(p => p.RecipeIngredients)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RecipeIngredients_Ingredients");
+
+            entity.HasOne(d => d.PendingProduct).WithMany(p => p.RecipeIngredients)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RecipeIngredients_PendingProducts");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.RecipeIngredients).HasConstraintName("FK_RecipeIngredients_Products");
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

@@ -1,8 +1,10 @@
-﻿using RecipeBookProject.Business.Models; 
+﻿using RecipeBookProject.Contracts; 
 using System.Threading.Tasks;
 using RecipeBookProject.Data.Entities;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using RecipeBookProject.Contracts;
+using RecipeBookProject.Business.Models;
 
 namespace RecipeBookProject.Business.Abstract
 {

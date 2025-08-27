@@ -1,9 +1,9 @@
-﻿using RecipeBookProject.Data.Entities;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RecipeBookProject.Contracts.Recipes;
 
 namespace RecipeBookProject.Business.Models
 {
@@ -18,5 +18,7 @@ namespace RecipeBookProject.Business.Models
         public string ImageUrl { get; set; } = null!;
         public int? ProductionTime { get; set; } 
         public string ProductDetailedText { get; set; } = null!;
+        public int BaseServingSize { get; set; } = 1;
+        public List<RecipeIngredientDto> Ingredients { get; set; } = new();
     }
 }

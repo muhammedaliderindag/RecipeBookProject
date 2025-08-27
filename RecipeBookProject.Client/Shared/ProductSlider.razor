@@ -18,12 +18,15 @@
                 <div class="slider-card">
                     <div class="col-12">
                                 <div class="card h-100 shadow-sm">
-                            <img src="@item.ImageUrl" class="card-img-top" alt="@item.Title" loading="lazy" />
+                            <img src="@item.ImageUrl" class="card-img-top" alt="@item.Title" loading="lazy" 
+                                 @onerror="() => OnImageError(item.ImageUrl, item.Title)" />
                                     <div class="card-body">
                                 <div class="small text-muted mb-1">@item.Footer • @item.ProductionTime dk</div>
                                 <h5 class="card-title">@item.Title</h5>
                                 <p class="card-text text-muted small">@item.Description</p>
-                                <NavLink class="btn btn-outline-primary btn-sm" href="@($"recipe/{item.ProductId}")">Tarife Git</NavLink>
+                                <div class="d-flex gap-2">
+                                    <NavLink class="btn btn-outline-primary btn-sm" href="@($"recipe/{item.ProductId}")">Tarife Git</NavLink>
+                                </div>
                                     </div>
                                 </div>
                             </div>
@@ -41,6 +44,11 @@
 
     private async Task Scroll(int dir)
         => await JS.InvokeVoidAsync("slider.scrollRowByPage", _containerId, dir);
+
+    private void OnImageError(string imageUrl, string title)
+    {
+        Console.WriteLine($"ERROR: ProductSlider - Image failed to load for '{title}': {imageUrl}");
+    }
 
     public class ProductCard
     {

@@ -34,9 +34,14 @@ public partial class PendingProduct
 
     public int UserId { get; set; }
 
+    public int BaseServingSize { get; set; }
+
     [ForeignKey("CategoryId")]
     [InverseProperty("PendingProducts")]
     public virtual Category Category { get; set; } = null!;
+
+    [InverseProperty("PendingProduct")]
+    public virtual ICollection<RecipeIngredient> RecipeIngredients { get; set; } = new List<RecipeIngredient>();
 
     [ForeignKey("UserId")]
     [InverseProperty("PendingProducts")]

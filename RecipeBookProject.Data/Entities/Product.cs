@@ -23,12 +23,16 @@ public partial class Product
 
     public int? FeaturedCategoryId { get; set; }
 
-    [StringLength(50)]
     public string? ImageUrl { get; set; }
 
     public int? ProductionTime { get; set; }
 
     public DateTime? CreatedAt { get; set; }
+
+    public int BaseServingSize { get; set; }
+
+    [Column("isVisible")]
+    public bool IsVisible { get; set; } = true;
 
     [ForeignKey("CategoryId")]
     [InverseProperty("Products")]
@@ -46,6 +50,9 @@ public partial class Product
 
     [InverseProperty("Product")]
     public virtual ICollection<ProductVote> ProductVotes { get; set; } = new List<ProductVote>();
+
+    [InverseProperty("Product")]
+    public virtual ICollection<RecipeIngredient> RecipeIngredients { get; set; } = new List<RecipeIngredient>();
 
     [InverseProperty("Product")]
     public virtual ICollection<SavedProduct> SavedProducts { get; set; } = new List<SavedProduct>();

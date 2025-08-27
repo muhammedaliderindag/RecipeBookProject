@@ -23,7 +23,6 @@ public partial class RefreshToken
     public DateTime? Revoked { get; set; }
     public bool IsExpired => DateTime.UtcNow >= Expires;
     public bool IsActive => Revoked == null && !IsExpired;
-
     [ForeignKey("UserId")]
     [InverseProperty("RefreshTokens")]
     public virtual User User { get; set; } = null!;
